@@ -193,7 +193,19 @@ const PLANOS_BASE = {
 };
 
 const STORAGE_KEY = "planos_treino_v2";
+const HISTORY_KEY = "planos_treino_historico_v1";
 const DEFAULT_REST_SECONDS = 50;
+const CARDIO_OPTIONS = [
+  "Esteira - caminhada inclinada",
+  "Esteira - corrida",
+  "Bike ergometrica",
+  "Eliptico",
+  "Remo",
+  "Escada / simulador",
+  "Corda",
+  "HIIT livre",
+];
+const CARDIO_EMPTY = { tipo: CARDIO_OPTIONS[0], minutos: "", distancia: "", intensidade: "", obs: "" };
 const WEEK_LABELS = [
   { dia: "A", prefix: "Dom", nome: "Domingo" },
   { dia: "B", prefix: "Seg", nome: "Segunda" },
@@ -291,6 +303,24 @@ function save(d) {
   }
 }
 
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
 function secondsFromRest(rest) {
   const values = String(rest).match(/\d+/g)?.map(Number) || [];
   return values.length ? Math.max(...values) : DEFAULT_REST_SECONDS;
@@ -300,6 +330,14 @@ function formatSeconds(total) {
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatDateTime(value) {
+  try {
+    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+  } catch {
+    return value;
+  }
 }
 
 export default function PlanosTreino() {
@@ -312,10 +350,14 @@ export default function PlanosTreino() {
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [treinoAtivo, setTreinoAtivo] = useState(false);
+  const [treinoSessao, setTreinoSessao] = useState(null);
+  const [historico, setHistorico] = useState(loadHistory);
+  const [cardioForm, setCardioForm] = useState(CARDIO_EMPTY);
   const [seriesConcluidas, setSeriesConcluidas] = useState({});
   const [timerX, setTimerX] = useState(12);
   const [timerDrag, setTimerDrag] = useState(null);
+  const [timerMinimizado, setTimerMinimizado] = useState(false);
+  const [sessionNow, setSessionNow] = useState(Date.now());
   const [timer, setTimer] = useState({
     duration: DEFAULT_REST_SECONDS,
     remaining: DEFAULT_REST_SECONDS,
@@ -334,8 +376,12 @@ export default function PlanosTreino() {
   const plano = planos[planoAtivo];
   const descansoPadrao = DEFAULT_REST_SECONDS;
   const timerPercent = timer.duration ? Math.max(0, Math.min(100, (timer.remaining / timer.duration) * 100)) : 0;
+  const treinoAtivo = Boolean(treinoSessao);
+  const activeDayKey = treinoSessao ? `${treinoSessao.planoId}:${treinoSessao.diaIdx}` : null;
+  const treinoDuracaoMin = treinoSessao ? Math.max(0, Math.round((sessionNow - new Date(treinoSessao.startedAt).getTime()) / 60000)) : 0;
 
   const exerciseKey = (planoId, diaIdx, exIdx) => `${planoId}:${diaIdx}:${exIdx}`;
+  const dayKey = (planoId, diaIdx) => `${planoId}:${diaIdx}`;
 
   const getCompletedSeries = (key) => seriesConcluidas[key] || 0;
 
@@ -370,6 +416,16 @@ export default function PlanosTreino() {
   }, [timer.running]);
 
   useEffect(() => {
+    if (!treinoSessao) return undefined;
+
+    const interval = window.setInterval(() => {
+      setSessionNow(Date.now());
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, [treinoSessao]);
+
+  useEffect(() => {
     if (!timer.autoCompletePending || !timer.targetKey) return;
     const [, diaIdx, exIdx] = timer.targetKey.split(":");
     const ex = plano.dias[Number(diaIdx)]?.exercicios[Number(exIdx)];
@@ -399,6 +455,7 @@ export default function PlanosTreino() {
   }, [timerDrag]);
 
   const startTimer = (seconds = descansoPadrao, label = "Descanso", targetKey = null) => {
+    setTimerMinimizado(false);
     setTimer({
       duration: seconds,
       remaining: seconds,
@@ -410,6 +467,7 @@ export default function PlanosTreino() {
   };
 
   const suggestRestTimer = (label = "Descanso sugerido", targetKey = null) => {
+    setTimerMinimizado(false);
     setTimer({
       duration: descansoPadrao,
       remaining: descansoPadrao,
@@ -420,16 +478,81 @@ export default function PlanosTreino() {
     });
   };
 
-  const iniciarTreino = () => {
-    setTreinoAtivo(true);
+  const iniciarTreinoDia = (diaIdx) => {
+    if (treinoSessao && activeDayKey !== dayKey(planoAtivo, diaIdx)) {
+      window.alert("Ja existe um treino em andamento. Encerre o treino atual antes de iniciar outro dia.");
+      return;
+    }
+
+    setTreinoSessao({
+      planoId: planoAtivo,
+      diaIdx,
+      startedAt: new Date().toISOString(),
+      cardio: [],
+    });
+    setSessionNow(Date.now());
     setSeriesConcluidas({});
-    setDiaAberto(0);
-    suggestRestTimer(`Descanso sugerido - ${plano.nome}`);
+    setDiaAberto(diaIdx);
+    suggestRestTimer(`Descanso sugerido - Dia ${plano.dias[diaIdx]?.dia || ""}`);
   };
 
   const encerrarTreino = () => {
-    setTreinoAtivo(false);
+    if (!treinoSessao) return;
+
+    const sessaoPlano = planos[treinoSessao.planoId];
+    const sessaoDia = sessaoPlano?.dias[treinoSessao.diaIdx];
+    const finishedAt = new Date().toISOString();
+    const duracaoMin = Math.max(1, Math.round((new Date(finishedAt).getTime() - new Date(treinoSessao.startedAt).getTime()) / 60000));
+    const registro = {
+      id: `treino_${Date.now()}`,
+      startedAt: treinoSessao.startedAt,
+      finishedAt,
+      duracaoMin,
+      planoId: treinoSessao.planoId,
+      planoNome: sessaoPlano?.nome || "",
+      dia: sessaoDia?.dia || "",
+      diaLabel: sessaoDia?.label || "",
+      series: { ...seriesConcluidas },
+      cardio: treinoSessao.cardio || [],
+      exercicios: (sessaoDia?.exercicios || []).map((ex, exIdx) => ({
+        id: ex.id,
+        nome: ex.nome,
+        series: ex.series,
+        reps: ex.reps,
+        carga: ex.carga || "",
+        cargaNotas: ex.cargaNotas || "",
+        feitas: seriesConcluidas[exerciseKey(treinoSessao.planoId, treinoSessao.diaIdx, exIdx)] || 0,
+      })),
+    };
+
+    const updatedHistory = [registro, ...historico].slice(0, 120);
+    setHistorico(updatedHistory);
+    saveHistory(updatedHistory);
+    setTreinoSessao(null);
     setTimer((current) => ({ ...current, running: false }));
+    setTab("historico");
+  };
+
+  const registrarCardio = () => {
+    if (!treinoSessao) return;
+    const minutos = Number(cardioForm.minutos);
+    if (!cardioForm.tipo || !minutos || minutos <= 0) {
+      window.alert("Informe o tipo de cardio e o tempo em minutos.");
+      return;
+    }
+
+    const item = {
+      id: `cardio_${Date.now()}`,
+      tipo: cardioForm.tipo,
+      minutos,
+      distancia: cardioForm.distancia,
+      intensidade: cardioForm.intensidade,
+      obs: cardioForm.obs,
+      registradoEm: new Date().toISOString(),
+    };
+
+    setTreinoSessao((current) => ({ ...current, cardio: [...(current?.cardio || []), item] }));
+    setCardioForm(CARDIO_EMPTY);
   };
 
   const toggleTimer = () => {
@@ -715,6 +838,7 @@ export default function PlanosTreino() {
         {[
           ["planos", "Exercicios"],
           ["cronograma", "Cronograma"],
+          ["historico", "Historico"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -760,25 +884,6 @@ export default function PlanosTreino() {
             </button>
           </div>
 
-          <div style={{ ...S.card, borderColor: treinoAtivo ? `${p.cor}88` : "#1e2938" }}>
-            <p style={{ ...S.label, color: treinoAtivo ? p.cor : "#64748b" }}>{treinoAtivo ? "Treino em andamento" : "Sessao de treino"}</p>
-            <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
-              {treinoAtivo
-                ? "Ao finalizar um timer iniciado em um exercicio, uma serie sera marcada automaticamente."
-                : "Inicie o treino para acompanhar as series concluidas e usar o descanso sugerido de 50s."}
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: treinoAtivo ? "1fr 1fr" : "1fr", gap: 8 }}>
-              <button style={{ ...S.btn(treinoAtivo ? "#334155" : p.corBorder), width: "100%" }} onClick={treinoAtivo ? encerrarTreino : iniciarTreino}>
-                {treinoAtivo ? "Encerrar Treino" : "Iniciar Treino"}
-              </button>
-              {treinoAtivo && (
-                <button style={{ ...S.btn(p.cor), width: "100%" }} onClick={() => suggestRestTimer(`Descanso sugerido - ${p.nome}`)}>
-                  Sugerir Timer - {formatSeconds(descansoPadrao)}
-                </button>
-              )}
-            </div>
-          </div>
-
           {p.dias.map((dia, diaIdx) => (
             <div key={dia.dia} style={S.diaCard(diaAberto === diaIdx)}>
               <div style={S.diaHeader} onClick={() => setDiaAberto(diaAberto === diaIdx ? null : diaIdx)}>
@@ -794,10 +899,104 @@ export default function PlanosTreino() {
 
               {diaAberto === diaIdx && (
                 <div>
+                  {(() => {
+                    const estaAtivo = activeDayKey === dayKey(planoAtivo, diaIdx);
+                    const outroAtivo = treinoSessao && !estaAtivo;
+
+                    return (
+                      <div style={{ ...S.card, margin: "0 12px 12px", borderColor: estaAtivo ? `${p.cor}88` : "#1e2938" }}>
+                        <p style={{ ...S.label, color: estaAtivo ? p.cor : "#64748b" }}>{estaAtivo ? `Treino iniciado - Dia ${dia.dia}` : `Sessao do Dia ${dia.dia}`}</p>
+                        <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+                          {estaAtivo
+                            ? `Tempo registrado ate agora: ${treinoDuracaoMin} min. Ao finalizar um timer de exercicio, uma serie sera concluida automaticamente.`
+                            : outroAtivo
+                              ? "Existe outro dia em andamento. Encerre o treino atual para iniciar este."
+                              : "Inicie este dia para acompanhar series, cardio e tempo total do treino."}
+                        </p>
+
+                        <div style={{ display: "grid", gridTemplateColumns: estaAtivo ? "1fr 1fr" : "1fr", gap: 8 }}>
+                          <button
+                            style={{ ...S.btn(estaAtivo ? "#334155" : p.corBorder), width: "100%", opacity: outroAtivo ? 0.55 : 1 }}
+                            onClick={estaAtivo ? encerrarTreino : () => iniciarTreinoDia(diaIdx)}
+                            disabled={Boolean(outroAtivo)}
+                          >
+                            {estaAtivo ? "Encerrar e salvar treino" : `Iniciar Treino - Dia ${dia.dia}`}
+                          </button>
+                          {estaAtivo && (
+                            <button style={{ ...S.btn(p.cor), width: "100%" }} onClick={() => suggestRestTimer(`Descanso sugerido - Dia ${dia.dia}`)}>
+                              Sugerir Timer - {formatSeconds(descansoPadrao)}
+                            </button>
+                          )}
+                        </div>
+
+                        {estaAtivo && (
+                          <div style={{ borderTop: "1px solid #1e2938", marginTop: 12, paddingTop: 12 }}>
+                            <p style={{ ...S.label, color: "#34d399" }}>Registrar cardio</p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.7fr", gap: 8, marginBottom: 8 }}>
+                              <select
+                                style={S.input}
+                                value={cardioForm.tipo}
+                                onChange={(event) => setCardioForm((current) => ({ ...current, tipo: event.target.value }))}
+                              >
+                                {CARDIO_OPTIONS.map((item) => (
+                                  <option key={item} value={item}>
+                                    {item}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                style={S.input}
+                                type="number"
+                                min="1"
+                                placeholder="min"
+                                value={cardioForm.minutos}
+                                onChange={(event) => setCardioForm((current) => ({ ...current, minutos: event.target.value }))}
+                              />
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                              <input
+                                style={S.input}
+                                placeholder="Distancia (opcional)"
+                                value={cardioForm.distancia}
+                                onChange={(event) => setCardioForm((current) => ({ ...current, distancia: event.target.value }))}
+                              />
+                              <input
+                                style={S.input}
+                                placeholder="Intensidade / FC"
+                                value={cardioForm.intensidade}
+                                onChange={(event) => setCardioForm((current) => ({ ...current, intensidade: event.target.value }))}
+                              />
+                            </div>
+                            <textarea
+                              style={{ ...S.input, minHeight: 58, resize: "vertical", marginBottom: 8 }}
+                              placeholder="Observacoes do cardio"
+                              value={cardioForm.obs}
+                              onChange={(event) => setCardioForm((current) => ({ ...current, obs: event.target.value }))}
+                            />
+                            <button style={{ ...S.btn("#16a34a"), width: "100%" }} onClick={registrarCardio}>
+                              Registrar cardio
+                            </button>
+                            {(treinoSessao.cardio || []).length > 0 && (
+                              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                                {treinoSessao.cardio.map((item) => (
+                                  <div key={item.id} style={{ ...S.badge("#34d399"), justifyContent: "space-between", whiteSpace: "normal" }}>
+                                    <span>{item.tipo}</span>
+                                    <span>{item.minutos} min</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {dia.exercicios.map((ex, exIdx) => {
                     const key = exerciseKey(planoAtivo, diaIdx, exIdx);
                     const done = getCompletedSeries(key);
                     const totalSeries = Number(ex.series) || 0;
+                    const diaTreinoAtivo = activeDayKey === dayKey(planoAtivo, diaIdx);
 
                     return (
                     <div key={ex.id} style={S.exRow}>
@@ -807,7 +1006,7 @@ export default function PlanosTreino() {
                           <span style={S.badge("#22d3ee")}>{ex.series} series</span>
                           <span style={S.badge("#a78bfa")}>{ex.reps} reps</span>
                           {ex.carga && <span style={S.badge("#f97316")}>{ex.carga}</span>}
-                          {treinoAtivo && <span style={S.badge(done >= totalSeries && totalSeries > 0 ? "#34d399" : "#64748b")}>{done}/{ex.series} feitas</span>}
+                          {diaTreinoAtivo && <span style={S.badge(done >= totalSeries && totalSeries > 0 ? "#34d399" : "#64748b")}>{done}/{ex.series} feitas</span>}
                         </div>
                         {ex.obs && <p style={{ margin: "0 0 10px", fontSize: 14, color: "#64748b", lineHeight: 1.5, fontStyle: "italic" }}>{ex.obs}</p>}
                         <label style={{ ...S.label, marginTop: 4 }}>Observacoes de carga / progressao</label>
@@ -825,7 +1024,7 @@ export default function PlanosTreino() {
                         <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: p.cor }} onClick={() => startTimer(descansoPadrao, ex.nome, key)}>
                           Timer
                         </button>
-                        {treinoAtivo && (
+                        {diaTreinoAtivo && (
                           <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: "#34d399" }} onClick={() => completeSeries(key, totalSeries || 99)}>
                             Serie +
                           </button>
@@ -910,6 +1109,62 @@ export default function PlanosTreino() {
               </p>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === "historico" && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
+            <p style={{ ...S.label, color: p.cor }}>Historico de treinos</p>
+            <p style={{ margin: 0, fontSize: 15, color: "#94a3b8", lineHeight: 1.5 }}>
+              Os treinos encerrados ficam salvos neste navegador para consulta futura. Para sincronizar entre celular e computador, o proximo passo e ligar este app a uma conta com banco de dados.
+            </p>
+          </div>
+
+          {historico.length === 0 ? (
+            <div style={S.card}>
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15 }}>Nenhum treino registrado ainda. Abra um dia, toque em Iniciar Treino e finalize para salvar o registro.</p>
+            </div>
+          ) : (
+            historico.map((registro) => (
+              <div key={registro.id} style={S.card}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <p style={{ margin: "0 0 4px", fontSize: 16, color: "#f8fafc", fontWeight: 700 }}>{registro.diaLabel}</p>
+                    <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+                      {registro.planoNome} - {formatDateTime(registro.startedAt)}
+                    </p>
+                  </div>
+                  <span style={S.badge(p.cor)}>{registro.duracaoMin} min</span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(registro.exercicios || []).map((ex) => (
+                    <div key={`${registro.id}-${ex.id}`} style={{ borderTop: "1px solid #1e2938", paddingTop: 8 }}>
+                      <p style={{ margin: "0 0 4px", color: "#e2e8f0", fontSize: 14, fontWeight: 700 }}>{ex.nome}</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        <span style={S.badge("#34d399")}>{ex.feitas}/{ex.series} series</span>
+                        <span style={S.badge("#a78bfa")}>{ex.reps} reps</span>
+                        {ex.carga && <span style={S.badge("#f97316")}>{ex.carga}</span>}
+                      </div>
+                      {ex.cargaNotas && <p style={{ margin: "6px 0 0", color: "#94a3b8", fontSize: 13, lineHeight: 1.5 }}>{ex.cargaNotas}</p>}
+                    </div>
+                  ))}
+                </div>
+
+                {(registro.cardio || []).length > 0 && (
+                  <div style={{ borderTop: "1px solid #1e2938", marginTop: 10, paddingTop: 10 }}>
+                    <p style={{ ...S.label, color: "#34d399" }}>Cardio</p>
+                    {(registro.cardio || []).map((item) => (
+                      <p key={item.id} style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: 14 }}>
+                        {item.tipo} - {item.minutos} min{item.distancia ? ` - ${item.distancia}` : ""}{item.intensidade ? ` - ${item.intensidade}` : ""}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -1032,37 +1287,58 @@ export default function PlanosTreino() {
         </div>
       )}
 
-      <section style={S.timerPanel} aria-label="Timer de descanso">
-        <div
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, cursor: timerDrag ? "grabbing" : "grab", userSelect: "none" }}
-          onPointerDown={(event) => setTimerDrag({ pointerX: event.clientX, startX: timerX })}
+      {timerMinimizado ? (
+        <button
+          style={{ ...S.timerPanel, width: "min(190px, calc(100vw - 24px))", padding: "10px 12px", textAlign: "left", cursor: "pointer" }}
+          onClick={() => setTimerMinimizado(false)}
+          aria-label="Abrir timer de descanso"
         >
-          <div style={{ minWidth: 0 }}>
-            <p style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer de descanso</p>
-            <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.label}</p>
-            <p style={{ margin: "2px 0 0", color: "#475569", fontSize: 12 }}>Arraste para esquerda ou direita</p>
+          <span style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer</span>
+          <strong style={{ display: "block", color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 26, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
+          <span style={{ display: "block", color: "#94a3b8", fontSize: 12 }}>Toque para abrir</span>
+        </button>
+      ) : (
+        <section style={S.timerPanel} aria-label="Timer de descanso">
+          <div
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, cursor: timerDrag ? "grabbing" : "grab", userSelect: "none" }}
+            onPointerDown={(event) => setTimerDrag({ pointerX: event.clientX, startX: timerX })}
+          >
+            <div style={{ minWidth: 0 }}>
+              <p style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer de descanso</p>
+              <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.label}</p>
+              <p style={{ margin: "2px 0 0", color: "#475569", fontSize: 12 }}>Arraste para esquerda ou direita</p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <strong style={{ color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 28, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
+              <button
+                style={{ ...S.timerBtn, padding: "6px 8px", fontSize: 12 }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => setTimerMinimizado(true)}
+              >
+                Min
+              </button>
+            </div>
           </div>
-          <strong style={{ color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 28, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
-        </div>
 
-        <div style={{ height: 6, background: "#1e2938", borderRadius: 999, overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ width: `${timerPercent}%`, height: "100%", background: timer.remaining === 0 ? "#34d399" : p.cor, transition: "width 0.25s linear" }} />
-        </div>
+          <div style={{ height: 6, background: "#1e2938", borderRadius: 999, overflow: "hidden", marginBottom: 10 }}>
+            <div style={{ width: `${timerPercent}%`, height: "100%", background: timer.remaining === 0 ? "#34d399" : p.cor, transition: "width 0.25s linear" }} />
+          </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
-          <button style={S.timerBtn} onClick={() => adjustTimer(-15)}>-15s</button>
-          <button style={S.timerBtn} onClick={toggleTimer}>{timer.running ? "Pausar" : timer.remaining === 0 ? "Repetir" : "Iniciar"}</button>
-          <button style={S.timerBtn} onClick={() => startTimer(descansoPadrao, `Descanso ${p.nome}`)}>{formatSeconds(descansoPadrao)}</button>
-          <button style={S.timerBtn} onClick={() => adjustTimer(15)}>+15s</button>
-          <button style={{ ...S.timerBtn, color: "#ef4444" }} onClick={() => setTimer((current) => ({ ...current, remaining: current.duration, running: false }))}>Reset</button>
-        </div>
-      </section>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
+            <button style={S.timerBtn} onClick={() => adjustTimer(-15)}>-15s</button>
+            <button style={S.timerBtn} onClick={toggleTimer}>{timer.running ? "Pausar" : timer.remaining === 0 ? "Repetir" : "Iniciar"}</button>
+            <button style={S.timerBtn} onClick={() => startTimer(descansoPadrao, `Descanso ${p.nome}`)}>{formatSeconds(descansoPadrao)}</button>
+            <button style={S.timerBtn} onClick={() => adjustTimer(15)}>+15s</button>
+            <button style={{ ...S.timerBtn, color: "#ef4444" }} onClick={() => setTimer((current) => ({ ...current, remaining: current.duration, running: false }))}>Reset</button>
+          </div>
+        </section>
+      )}
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#080c14", borderTop: "1px solid #1e2938", display: "flex", zIndex: 100 }}>
         {Object.values(planos).map((pl) => (
           <button
             key={pl.id}
-            style={S.navBtn(planoAtivo === pl.id && tab !== "coach", pl.cor)}
+            style={S.navBtn(planoAtivo === pl.id && tab === "planos", pl.cor)}
             onClick={() => {
               setPlanoAtivo(pl.id);
               setDiaAberto(null);
