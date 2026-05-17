@@ -2,6 +2,25 @@
 
 Aplicativo React/Vite para planos de treino, cronograma, edicao de exercicios e timer de descanso.
 
+## Sincronizacao entre dispositivos
+
+O app funciona offline com `localStorage` e tambem esta preparado para sincronizar o historico com Supabase.
+
+1. Crie um projeto em https://supabase.com.
+2. No painel do Supabase, abra SQL Editor e execute o arquivo `supabase.sql`.
+3. Em Authentication > URL Configuration, configure:
+   - Site URL: `https://planodetreino.vercel.app`
+   - Redirect URLs: `https://planodetreino.vercel.app/*`
+4. Em Project Settings > API, copie:
+   - Project URL
+   - anon public key
+5. Na Vercel, em Settings > Environment Variables, adicione:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+6. Faca um novo deploy na Vercel.
+
+Depois disso, abra a aba Historico no app, informe seu e-mail e use o link magico de acesso. Cada treino encerrado sera salvo localmente e sincronizado na nuvem.
+
 ## Rodar localmente
 
 ```bash
@@ -83,6 +102,6 @@ http://localhost:5173
 
 ## Observacoes
 
-- O app salva edicoes no `localStorage` do navegador.
-- Para dados compartilhados entre varios usuarios/dispositivos, sera necessario adicionar backend e autenticacao.
+- O app salva edicoes e historico no `localStorage` do navegador.
+- Com Supabase configurado, o historico de treinos sincroniza entre dispositivos com login por e-mail.
 - O Coach IA esta offline/local. Para IA real, use um backend proxy para proteger a chave da API.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isSupabaseConfigured, supabase } from "./supabaseClient";
 
 const PLANOS_BASE = {
   adaptacao: {
@@ -340,6 +341,17 @@ function formatDateTime(value) {
   }
 }
 
+function mergeHistory(localHistory, remoteHistory) {
+  const byId = new Map();
+  [...remoteHistory, ...localHistory].forEach((item) => {
+    if (item?.id) byId.set(item.id, item);
+  });
+
+  return Array.from(byId.values())
+    .sort((a, b) => new Date(b.startedAt || b.created_at || 0).getTime() - new Date(a.startedAt || a.created_at || 0).getTime())
+    .slice(0, 120);
+}
+
 export default function PlanosTreino() {
   const [planos, setPlanos] = useState(load);
   const [planoAtivo, setPlanoAtivo] = useState("adaptacao");
@@ -353,6 +365,10 @@ export default function PlanosTreino() {
   const [treinoSessao, setTreinoSessao] = useState(null);
   const [historico, setHistorico] = useState(loadHistory);
   const [cardioForm, setCardioForm] = useState(CARDIO_EMPTY);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authUser, setAuthUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? "Entre para sincronizar" : "Sync nao configurado");
+  const [syncLoading, setSyncLoading] = useState(false);
   const [seriesConcluidas, setSeriesConcluidas] = useState({});
   const [timerX, setTimerX] = useState(12);
   const [timerDrag, setTimerDrag] = useState(null);
@@ -385,6 +401,12 @@ export default function PlanosTreino() {
 
   const getCompletedSeries = (key) => seriesConcluidas[key] || 0;
 
+  const persistHistory = (updated) => {
+    const merged = mergeHistory(updated, []);
+    setHistorico(merged);
+    saveHistory(merged);
+  };
+
   const completeSeries = (key, maxSeries = 99) => {
     if (!key) return;
     setSeriesConcluidas((current) => ({
@@ -416,6 +438,20 @@ export default function PlanosTreino() {
   }, [timer.running]);
 
   useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return undefined;
+
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthUser(data.session?.user || null);
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user || null);
+    });
+
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     if (!treinoSessao) return undefined;
 
     const interval = window.setInterval(() => {
@@ -424,6 +460,11 @@ export default function PlanosTreino() {
 
     return () => window.clearInterval(interval);
   }, [treinoSessao]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    syncHistoryFromCloud(authUser);
+  }, [authUser]);
 
   useEffect(() => {
     if (!timer.autoCompletePending || !timer.targetKey) return;
@@ -526,8 +567,15 @@ export default function PlanosTreino() {
     };
 
     const updatedHistory = [registro, ...historico].slice(0, 120);
-    setHistorico(updatedHistory);
-    saveHistory(updatedHistory);
+    persistHistory(updatedHistory);
+    if (authUser) {
+      syncHistoryToCloud(updatedHistory, authUser)
+        .then(() => setSyncStatus(`Sincronizado: ${updatedHistory.length} registros`))
+        .catch((error) => {
+          console.error("Erro ao enviar treino:", error);
+          setSyncStatus("Treino salvo localmente; sync pendente");
+        });
+    }
     setTreinoSessao(null);
     setTimer((current) => ({ ...current, running: false }));
     setTab("historico");
@@ -570,6 +618,88 @@ export default function PlanosTreino() {
       const nextDuration = Math.max(current.duration, nextRemaining);
       return { ...current, remaining: nextRemaining, duration: nextDuration, running: nextRemaining > 0 && current.running };
     });
+  };
+
+  const syncHistoryToCloud = async (items = historico, user = authUser) => {
+    if (!isSupabaseConfigured || !supabase || !user) return;
+    if (!items.length) return;
+
+    const rows = items.map((item) => ({
+      id: item.id,
+      user_id: user.id,
+      started_at: item.startedAt,
+      finished_at: item.finishedAt || null,
+      payload: item,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase.from("workout_history").upsert(rows, { onConflict: "id" });
+    if (error) throw error;
+  };
+
+  const syncHistoryFromCloud = async (user = authUser) => {
+    if (!isSupabaseConfigured || !supabase || !user) return;
+
+    setSyncLoading(true);
+    setSyncStatus("Sincronizando...");
+    try {
+      const { data, error } = await supabase
+        .from("workout_history")
+        .select("payload")
+        .order("started_at", { ascending: false })
+        .limit(120);
+
+      if (error) throw error;
+
+      const remoteHistory = (data || []).map((row) => row.payload).filter(Boolean);
+      const merged = mergeHistory(historico, remoteHistory);
+      persistHistory(merged);
+      await syncHistoryToCloud(merged, user);
+      setSyncStatus(`Sincronizado: ${merged.length} registros`);
+    } catch (error) {
+      console.error("Erro ao sincronizar historico:", error);
+      setSyncStatus("Erro ao sincronizar");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const enviarLinkLogin = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      window.alert("Configure o Supabase no Vercel antes de ativar o login.");
+      return;
+    }
+
+    if (!authEmail.trim()) {
+      window.alert("Informe seu e-mail para receber o link de acesso.");
+      return;
+    }
+
+    setSyncLoading(true);
+    setSyncStatus("Enviando link de acesso...");
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: authEmail.trim(),
+        options: {
+          emailRedirectTo: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
+      setSyncStatus("Link enviado. Abra o e-mail neste aparelho para entrar.");
+    } catch (error) {
+      console.error("Erro no login:", error);
+      setSyncStatus("Nao foi possivel enviar o link");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const sairDaConta = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setAuthUser(null);
+    setSyncStatus("Entre para sincronizar");
   };
 
   const startEdit = (planoId, diaIdx, exIdx) => {
@@ -1117,8 +1247,51 @@ export default function PlanosTreino() {
           <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
             <p style={{ ...S.label, color: p.cor }}>Historico de treinos</p>
             <p style={{ margin: 0, fontSize: 15, color: "#94a3b8", lineHeight: 1.5 }}>
-              Os treinos encerrados ficam salvos neste navegador para consulta futura. Para sincronizar entre celular e computador, o proximo passo e ligar este app a uma conta com banco de dados.
+              Os treinos encerrados ficam salvos neste aparelho e, com login ativo, tambem sincronizam na nuvem para consulta em qualquer celular ou computador.
             </p>
+          </div>
+
+          <div style={{ ...S.card, borderColor: authUser ? "#34d39955" : "#1e2938" }}>
+            <p style={{ ...S.label, color: authUser ? "#34d399" : p.cor }}>Sincronizacao na nuvem</p>
+            {!isSupabaseConfigured ? (
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+                O app ja esta pronto para sincronizar. Falta configurar as variaveis do Supabase no Vercel e criar a tabela do arquivo supabase.sql.
+              </p>
+            ) : authUser ? (
+              <div>
+                <p style={{ margin: "0 0 10px", color: "#94a3b8", fontSize: 15 }}>
+                  Conectado como <strong style={{ color: "#e2e8f0" }}>{authUser.email}</strong>
+                </p>
+                <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>{syncStatus}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button style={{ ...S.btn("#16a34a"), opacity: syncLoading ? 0.6 : 1 }} onClick={() => syncHistoryFromCloud(authUser)} disabled={syncLoading}>
+                    Sincronizar agora
+                  </button>
+                  <button style={S.btnGhost} onClick={sairDaConta}>
+                    Sair
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ margin: "0 0 10px", color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+                  Entre com seu e-mail para salvar o historico na nuvem e recuperar os treinos em outro aparelho.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                  <input
+                    style={S.input}
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={authEmail}
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                  />
+                  <button style={{ ...S.btn(p.corBorder), opacity: syncLoading ? 0.6 : 1 }} onClick={enviarLinkLogin} disabled={syncLoading}>
+                    Enviar link
+                  </button>
+                </div>
+                <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>{syncStatus}</p>
+              </div>
+            )}
           </div>
 
           {historico.length === 0 ? (
