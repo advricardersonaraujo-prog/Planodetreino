@@ -1,0 +1,24 @@
+{
+  "name": "planos-treino",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:lan": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "serve": "node serve-dist.js",
+    "start": "node serve-dist.js",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "6.0.1",
+    "vite": "8.0.10",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Planos de Treino",
+  "short_name": "Treino",
+  "description": "Planos de treino com cronograma, edicao e timer de descanso.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

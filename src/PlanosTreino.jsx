@@ -1,0 +1,877 @@
+import { useEffect, useState } from "react";
+
+const PLANOS_BASE = {
+  adaptacao: {
+    id: "adaptacao",
+    nome: "ADAPTACAO",
+    subtitulo: "Semanas 1-4 - Retorno progressivo",
+    cor: "#22d3ee",
+    corBg: "#083344",
+    corBorder: "#0e7490",
+    icon: "↻",
+    descricao:
+      "Reativacao neuromuscular apos pausa. Cargas moderadas (60-70% 1RM), foco em tecnica, amplitude total e reconexao mente-musculo. Volumes baixos para evitar overreaching.",
+    parametros: { series: "3", reps: "12-15", descanso: "60s", intensidade: "60-70% 1RM" },
+    dias: [
+      {
+        dia: "A",
+        label: "Seg - Peito + Triceps",
+        grupos: ["Peito", "Triceps"],
+        exercicios: [
+          { id: "a1", nome: "Supino Reto com Halteres", series: 3, reps: "12-15", carga: "", obs: "Foco em amplitude total, cotovelos a 45 graus" },
+          { id: "a2", nome: "Supino Inclinado com Halteres", series: 3, reps: "12-15", carga: "", obs: "Angulo 30-45 graus, nao forcar ombro" },
+          { id: "a3", nome: "Crucifixo na Polia (cross-over)", series: 3, reps: "15", carga: "", obs: "Amplitude controlada, sem travamento" },
+          { id: "a4", nome: "Triceps Pulley (corda)", series: 3, reps: "15", carga: "", obs: "Cotovelo fixo, extensao completa" },
+          { id: "a5", nome: "Triceps Testa com Halteres", series: 3, reps: "12", carga: "", obs: "Movimento lento na descida" },
+        ],
+      },
+      {
+        dia: "B",
+        label: "Ter - Costas + Biceps",
+        grupos: ["Costas", "Biceps"],
+        exercicios: [
+          { id: "b1", nome: "Puxada Frontal (pegada aberta)", series: 3, reps: "12-15", carga: "", obs: "Nao travar na extensao, retracao escapular" },
+          { id: "b2", nome: "Remada Curvada com Barra", series: 3, reps: "12", carga: "", obs: "Coluna neutra, puxada no umbigo" },
+          { id: "b3", nome: "Remada Cavalinho (unilateral)", series: 3, reps: "12", carga: "", obs: "Apoio firme, cotovelo proximo ao tronco" },
+          { id: "b4", nome: "Rosca Direta com Barra", series: 3, reps: "12-15", carga: "", obs: "Sem balanco, cotovelo fixo" },
+          { id: "b5", nome: "Rosca Martelo Alternada", series: 3, reps: "12", carga: "", obs: "Pronacao neutra, nao abrir cotovelo" },
+        ],
+      },
+      {
+        dia: "C",
+        label: "Qui - Pernas",
+        grupos: ["Pernas", "Gluteos"],
+        exercicios: [
+          { id: "c1", nome: "Agachamento Livre", series: 3, reps: "12-15", carga: "", obs: "Profundidade paralela, joelhos alinhados" },
+          { id: "c2", nome: "Leg Press 45 graus", series: 3, reps: "15", carga: "", obs: "Nao travar joelhos, pes no centro" },
+          { id: "c3", nome: "Cadeira Extensora", series: 3, reps: "15", carga: "", obs: "Contracao no topo, descer controlado" },
+          { id: "c4", nome: "Cadeira Flexora", series: 3, reps: "15", carga: "", obs: "Quadril fixo no banco" },
+          { id: "c5", nome: "Panturrilha em Pe (Smith)", series: 3, reps: "20", carga: "", obs: "Amplitude maxima, pausa no estiramento" },
+        ],
+      },
+      {
+        dia: "D",
+        label: "Sex - Ombros + Abdomen",
+        grupos: ["Ombros", "Abdomen"],
+        exercicios: [
+          { id: "d1", nome: "Desenvolvimento com Halteres", series: 3, reps: "12-15", carga: "", obs: "Nao hiperestender lombar" },
+          { id: "d2", nome: "Elevacao Lateral com Halteres", series: 3, reps: "15", carga: "", obs: "Cotovelo levemente flexionado, sem balanco" },
+          { id: "d3", nome: "Elevacao Frontal (polia baixa)", series: 3, reps: "12", carga: "", obs: "Ate altura dos ombros, controlado" },
+          { id: "d4", nome: "Face Pull na Polia", series: 3, reps: "15", carga: "", obs: "Retracao escapular, maos na tempora" },
+          { id: "d5", nome: "Prancha Frontal", series: 3, reps: "30-40s", carga: "", obs: "Quadril neutro, respiracao constante" },
+          { id: "d6", nome: "Abdominal Crunch na Polia", series: 3, reps: "15", carga: "", obs: "Flexao de tronco, nao puxar com bracos" },
+        ],
+      },
+    ],
+  },
+  manutencao: {
+    id: "manutencao",
+    nome: "MANUTENCAO",
+    subtitulo: "Semanas 5-10 - Hipertrofia controlada",
+    cor: "#a78bfa",
+    corBg: "#2e1065",
+    corBorder: "#7c3aed",
+    icon: "◆",
+    descricao:
+      "Estimulo moderado-alto para manter e reconstruir massa magra. Progressao de carga semanal, tecnicas como drop-set introduzidas gradualmente. Deficit calorico leve permitido.",
+    parametros: { series: "4", reps: "8-12", descanso: "75-90s", intensidade: "70-80% 1RM" },
+    dias: [
+      {
+        dia: "A",
+        label: "Seg - Peito + Triceps",
+        grupos: ["Peito", "Triceps"],
+        exercicios: [
+          { id: "ma1", nome: "Supino Reto com Barra", series: 4, reps: "8-10", carga: "", obs: "Progressao de carga semanal obrigatoria" },
+          { id: "ma2", nome: "Supino Inclinado com Halteres", series: 4, reps: "10-12", carga: "", obs: "Ultima serie drop-set a partir da semana 7" },
+          { id: "ma3", nome: "Crossover (polia alta)", series: 3, reps: "12", carga: "", obs: "Cruzar na frente, squeeze no pico" },
+          { id: "ma4", nome: "Mergulho (paralelas com carga)", series: 4, reps: "8-10", carga: "", obs: "Peso extra no cinto se necessario" },
+          { id: "ma5", nome: "Triceps Frances com Haltere", series: 3, reps: "10-12", carga: "", obs: "Extensao unilateral, cotovelo vertical" },
+        ],
+      },
+      {
+        dia: "B",
+        label: "Ter - Costas + Biceps",
+        grupos: ["Costas", "Biceps"],
+        exercicios: [
+          { id: "mb1", nome: "Barra Fixa com Carga", series: 4, reps: "6-8", carga: "", obs: "Pegada pronada, amplitude total" },
+          { id: "mb2", nome: "Remada Curvada com Barra", series: 4, reps: "8-10", carga: "", obs: "Progressao linear semanal" },
+          { id: "mb3", nome: "Serrote com Halter (unilateral)", series: 3, reps: "10-12", carga: "", obs: "Cotovelo ultrapassando o tronco" },
+          { id: "mb4", nome: "Puxada Pegada Neutra (triangulo)", series: 3, reps: "10-12", carga: "", obs: "Cotovelos puxados para o quadril" },
+          { id: "mb5", nome: "Rosca Scott com Barra EZ", series: 4, reps: "8-10", carga: "", obs: "Pico de contracao, descer lento" },
+          { id: "mb6", nome: "Rosca Concentrada", series: 3, reps: "12", carga: "", obs: "Isolamento total, sem compensacao" },
+        ],
+      },
+      {
+        dia: "C",
+        label: "Qui - Pernas",
+        grupos: ["Pernas", "Gluteos"],
+        exercicios: [
+          { id: "mc1", nome: "Agachamento Livre", series: 4, reps: "6-8", carga: "", obs: "Carga principal do treino - progressao obrigatoria" },
+          { id: "mc2", nome: "Leg Press 45 graus", series: 4, reps: "10-12", carga: "", obs: "Posicao alta para gluteo, baixa para quad" },
+          { id: "mc3", nome: "Stiff com Barra", series: 4, reps: "8-10", carga: "", obs: "Joelhos levemente flexionados, lombar neutra" },
+          { id: "mc4", nome: "Afundo com Halteres (passadas)", series: 3, reps: "12 cada", carga: "", obs: "Joelho traseiro quase no chao" },
+          { id: "mc5", nome: "Panturrilha Sentado", series: 4, reps: "15-20", carga: "", obs: "Soleus - joelho flexionado isola o musculo" },
+        ],
+      },
+      {
+        dia: "D",
+        label: "Sex - Ombros + Abs + Cardio",
+        grupos: ["Ombros", "Abdomen"],
+        exercicios: [
+          { id: "md1", nome: "Desenvolvimento Arnold", series: 4, reps: "8-10", carga: "", obs: "Rotacao completa, recrutamento de deltoide anterior e medial" },
+          { id: "md2", nome: "Elevacao Lateral na Maquina", series: 4, reps: "12-15", carga: "", obs: "Maquina isola melhor que halter para hipertrofia" },
+          { id: "md3", nome: "Encolhimento de Ombros com Halteres", series: 3, reps: "12-15", carga: "", obs: "Trapezio superior, pausa no topo" },
+          { id: "md4", nome: "Face Pull com Corda", series: 3, reps: "15", carga: "", obs: "Saude do manguito rotador - nao negligenciar" },
+          { id: "md5", nome: "Abdominal Reto (polia alta)", series: 4, reps: "12-15", carga: "", obs: "Flexao de tronco pura" },
+          { id: "md6", nome: "Obliquo na Polia (unilateral)", series: 3, reps: "15 cada", carga: "", obs: "Rotacao de tronco controlada" },
+        ],
+      },
+    ],
+  },
+  queima: {
+    id: "queima",
+    nome: "QUEIMA",
+    subtitulo: "Semanas 11-16 - Definicao + Lipolise",
+    cor: "#f97316",
+    corBg: "#431407",
+    corBorder: "#c2410c",
+    icon: "▲",
+    descricao:
+      "Alto volume, menor descanso, cardio HIIT integrado. Manter carga para preservar massa. Supersets e trisets para elevar EPOC. Deficit calorico moderado (300-500 kcal).",
+    parametros: { series: "4-5", reps: "12-20", descanso: "30-45s", intensidade: "65-75% 1RM + tecnicas avancadas" },
+    dias: [
+      {
+        dia: "A",
+        label: "Seg - Peito + Triceps (Superset)",
+        grupos: ["Peito", "Triceps"],
+        exercicios: [
+          { id: "qa1", nome: "SUPERSET: Supino Reto + Triceps Pulley", series: 4, reps: "12 + 15", carga: "", obs: "Sem descanso entre os dois; 45s apos o par" },
+          { id: "qa2", nome: "SUPERSET: Crucifixo Inclinado + Mergulho", series: 4, reps: "12 + falha", carga: "", obs: "Falha controlada nas paralelas" },
+          { id: "qa3", nome: "Crossover Baixo -> Alto (bi-direcional)", series: 3, reps: "15 cada direcao", carga: "", obs: "Continuo sem parar entre direcoes" },
+          { id: "qa4", nome: "Flexao de Braco (fechada - triceps)", series: 3, reps: "maximo", carga: "", obs: "Ate falha, ritmo controlado" },
+          { id: "qa5", nome: "HIIT - Corda ou Bike", series: 1, reps: "10 min", carga: "", obs: "20s sprint / 40s moderado x 10 ciclos" },
+        ],
+      },
+      {
+        dia: "B",
+        label: "Ter - Costas + Biceps (Superset)",
+        grupos: ["Costas", "Biceps"],
+        exercicios: [
+          { id: "qb1", nome: "SUPERSET: Puxada Frontal + Rosca Direta", series: 4, reps: "12 + 12", carga: "", obs: "Sem descanso entre os dois" },
+          { id: "qb2", nome: "SUPERSET: Remada Curvada + Rosca Martelo", series: 4, reps: "10 + 12", carga: "", obs: "Manter forma na fadiga - reduzir carga se necessario" },
+          { id: "qb3", nome: "Pullover na Polia (reto)", series: 3, reps: "15", carga: "", obs: "Grande dorsal - cotovelo fixo levemente flexionado" },
+          { id: "qb4", nome: "Rosca 21s com Barra EZ", series: 3, reps: "21 (7+7+7)", carga: "", obs: "7 meios movimentos baixos + 7 altos + 7 completos" },
+          { id: "qb5", nome: "HIIT - Eliptico", series: 1, reps: "10 min", carga: "", obs: "Nivel alto / baixo alternados a cada 30s" },
+        ],
+      },
+      {
+        dia: "C",
+        label: "Qui - Pernas Completo (Triset)",
+        grupos: ["Pernas", "Gluteos"],
+        exercicios: [
+          { id: "qc1", nome: "TRISET: Agachamento + Cadeira Ext. + Leg Press", series: 4, reps: "10 + 12 + 15", carga: "", obs: "Triset sem descanso - devastador para quad" },
+          { id: "qc2", nome: "SUPERSET: Stiff + Cadeira Flexora", series: 4, reps: "10 + 12", carga: "", obs: "Posterior da coxa - isquiotibiais e gluteo" },
+          { id: "qc3", nome: "Afundo com Salto (plyometrico)", series: 3, reps: "10 cada", carga: "", obs: "Explosao no salto, aterrissagem suave" },
+          { id: "qc4", nome: "Panturrilha em Pe (drop-set)", series: 3, reps: "15+15+15", carga: "", obs: "3 quedas de carga seguidas sem parar" },
+          { id: "qc5", nome: "HIIT - Esteira Inclinada", series: 1, reps: "12 min", carga: "", obs: "Inclinacao 8-12%, alternar caminhada rapida e corrida" },
+        ],
+      },
+      {
+        dia: "D",
+        label: "Sex - Ombros + Core + HIIT Final",
+        grupos: ["Ombros", "Abdomen"],
+        exercicios: [
+          { id: "qd1", nome: "SUPERSET: Desenvolvimento + Elevacao Lateral", series: 4, reps: "10 + 15", carga: "", obs: "Pre-exaustao do medial antes do desenvolvimento" },
+          { id: "qd2", nome: "SUPERSET: Face Pull + Elevacao Frontal", series: 3, reps: "15 + 12", carga: "", obs: "Equilibrio anterior-posterior do ombro" },
+          { id: "qd3", nome: "TRISET: Prancha + Crunch + Obliquo", series: 4, reps: "30s + 15 + 15", carga: "", obs: "Core completo sem pausa" },
+          { id: "qd4", nome: "Mountain Climber", series: 3, reps: "30s", carga: "", obs: "Cardio + core simultaneo, ritmo alto" },
+          { id: "qd5", nome: "HIIT Final - Burpee ou Bike", series: 1, reps: "15 min", carga: "", obs: "Ultimo esforco da semana - maxima intensidade" },
+        ],
+      },
+    ],
+  },
+};
+
+const STORAGE_KEY = "planos_treino_v2";
+
+function cloneBase() {
+  return JSON.parse(JSON.stringify(PLANOS_BASE));
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : cloneBase();
+  } catch {
+    return cloneBase();
+  }
+}
+
+function save(d) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
+function secondsFromRest(rest) {
+  const values = String(rest).match(/\d+/g)?.map(Number) || [];
+  return values.length ? Math.max(...values) : 60;
+}
+
+function formatSeconds(total) {
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export default function PlanosTreino() {
+  const [planos, setPlanos] = useState(load);
+  const [planoAtivo, setPlanoAtivo] = useState("adaptacao");
+  const [diaAberto, setDiaAberto] = useState(null);
+  const [editando, setEditando] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [tab, setTab] = useState("planos");
+  const [aiInput, setAiInput] = useState("");
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [timer, setTimer] = useState({
+    duration: 60,
+    remaining: 60,
+    running: false,
+    label: "Descanso",
+  });
+
+  const persist = (updated) => {
+    setPlanos(updated);
+    save(updated);
+  };
+
+  const plano = planos[planoAtivo];
+  const descansoPadrao = secondsFromRest(plano.parametros.descanso);
+  const timerPercent = timer.duration ? Math.max(0, Math.min(100, (timer.remaining / timer.duration) * 100)) : 0;
+
+  useEffect(() => {
+    if (!timer.running) return undefined;
+
+    const interval = window.setInterval(() => {
+      setTimer((current) => {
+        if (current.remaining <= 1) {
+          return { ...current, remaining: 0, running: false };
+        }
+
+        return { ...current, remaining: current.remaining - 1 };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [timer.running]);
+
+  const startTimer = (seconds = descansoPadrao, label = "Descanso") => {
+    setTimer({
+      duration: seconds,
+      remaining: seconds,
+      running: true,
+      label,
+    });
+  };
+
+  const toggleTimer = () => {
+    if (timer.remaining === 0) {
+      startTimer(timer.duration || descansoPadrao, timer.label);
+      return;
+    }
+
+    setTimer((current) => ({ ...current, running: !current.running }));
+  };
+
+  const adjustTimer = (delta) => {
+    setTimer((current) => {
+      const nextRemaining = Math.max(0, current.remaining + delta);
+      const nextDuration = Math.max(current.duration, nextRemaining);
+      return { ...current, remaining: nextRemaining, duration: nextDuration, running: nextRemaining > 0 && current.running };
+    });
+  };
+
+  const startEdit = (planoId, diaIdx, exIdx) => {
+    const ex = planos[planoId].dias[diaIdx].exercicios[exIdx];
+    setEditForm({ ...ex });
+    setEditando({ planoId, diaIdx, exIdx });
+  };
+
+  const saveEdit = () => {
+    if (!editando) return;
+    const { planoId, diaIdx, exIdx } = editando;
+    const updated = JSON.parse(JSON.stringify(planos));
+    updated[planoId].dias[diaIdx].exercicios[exIdx] = { ...editForm };
+    persist(updated);
+    setEditando(null);
+  };
+
+  const addExercicio = (planoId, diaIdx) => {
+    const updated = JSON.parse(JSON.stringify(planos));
+    updated[planoId].dias[diaIdx].exercicios.push({
+      id: `custom_${Date.now()}`,
+      nome: "Novo exercicio",
+      series: 3,
+      reps: "12",
+      carga: "",
+      obs: "",
+    });
+    persist(updated);
+  };
+
+  const removeExercicio = (planoId, diaIdx, exIdx) => {
+    const updated = JSON.parse(JSON.stringify(planos));
+    updated[planoId].dias[diaIdx].exercicios.splice(exIdx, 1);
+    persist(updated);
+  };
+
+  const resetPlano = (planoId) => {
+    const updated = JSON.parse(JSON.stringify(planos));
+    updated[planoId] = JSON.parse(JSON.stringify(PLANOS_BASE[planoId]));
+    persist(updated);
+  };
+
+  const askAI = async (msg) => {
+    const userMsg = msg || aiInput.trim();
+    if (!userMsg) return;
+    const newMessages = [...aiMessages, { role: "user", text: userMsg }];
+    setAiMessages(newMessages);
+    setAiInput("");
+    setAiLoading(true);
+
+    const planoResumo = Object.values(planos).map((pl) => ({
+      plano: pl.nome,
+      fase: pl.subtitulo,
+      dias: pl.dias.map((d) => ({
+        dia: d.label,
+        exercicios: d.exercicios.map((e) => `${e.nome} ${e.series}x${e.reps}${e.carga ? ` ${e.carga}` : ""}`),
+      })),
+    }));
+
+    const reply = `✅ Boa pergunta. Para este app local, estou usando uma resposta offline porque chamadas diretas para APIs de IA no navegador precisam de uma chave protegida no servidor.\n\nPlano ativo: ${plano.nome}\nFase: ${plano.subtitulo}\n\n⚡ Use progressao conservadora: aumente carga apenas quando completar todas as series com tecnica limpa.\n⚠️ Se dor articular aparecer, reduza carga ou amplitude e priorize execucao.`;
+
+    console.info("Resumo enviado ao coach offline:", planoResumo);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    setAiMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+    setAiLoading(false);
+  };
+
+  const p = plano;
+
+  const S = {
+    app: {
+      minHeight: "100vh",
+      background: "#080c14",
+      color: "#e2e8f0",
+      fontFamily: "'DM Mono', 'Fira Code', 'Courier New', monospace",
+      paddingBottom: 170,
+      fontSize: 16,
+    },
+    header: {
+      background: `linear-gradient(160deg, ${p.corBg} 0%, #0d1117 60%)`,
+      padding: "20px 16px 14px",
+      borderBottom: `1px solid ${p.corBorder}33`,
+      transition: "background 0.4s",
+    },
+    pill: (cor) => ({
+      display: "inline-block",
+      background: `${cor}22`,
+      color: cor,
+      border: `1px solid ${cor}44`,
+      borderRadius: 20,
+      padding: "5px 14px",
+      fontSize: 13,
+      letterSpacing: 2,
+      textTransform: "uppercase",
+      marginBottom: 6,
+    }),
+    card: {
+      background: "#0d1117",
+      border: "1px solid #1e2938",
+      borderRadius: 8,
+      padding: 14,
+      marginBottom: 10,
+    },
+    diaCard: (aberto) => ({
+      background: aberto ? `${p.corBg}88` : "#0d1117",
+      border: `1px solid ${aberto ? p.corBorder : "#1e2938"}`,
+      borderRadius: 8,
+      marginBottom: 10,
+      overflow: "hidden",
+      transition: "all 0.3s",
+    }),
+    diaHeader: {
+      padding: "16px 16px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      cursor: "pointer",
+      gap: 10,
+    },
+    exRow: {
+      padding: "14px 16px 14px 12px",
+      borderTop: "1px solid #1e293822",
+      display: "flex",
+      gap: 10,
+      alignItems: "flex-start",
+    },
+    badge: (cor) => ({
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: `${cor}22`,
+      color: cor,
+      border: `1px solid ${cor}44`,
+      borderRadius: 6,
+      padding: "4px 10px",
+      fontSize: 13,
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+    }),
+    btn: (cor) => ({
+      background: cor,
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "13px 18px",
+      fontWeight: 700,
+      fontSize: 14,
+      letterSpacing: 1,
+      cursor: "pointer",
+      fontFamily: "inherit",
+    }),
+    btnGhost: {
+      background: "none",
+      color: "#64748b",
+      border: "1px solid #1e2938",
+      borderRadius: 6,
+      padding: "8px 12px",
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: "inherit",
+    },
+    input: {
+      background: "#161b27",
+      border: "1px solid #2d3748",
+      borderRadius: 8,
+      padding: "12px 14px",
+      color: "#e2e8f0",
+      fontSize: 15,
+      width: "100%",
+      boxSizing: "border-box",
+      fontFamily: "inherit",
+      outline: "none",
+    },
+    label: {
+      fontSize: 12,
+      color: "#64748b",
+      letterSpacing: 2,
+      textTransform: "uppercase",
+      marginBottom: 6,
+      display: "block",
+    },
+    navBtn: (active, cor) => ({
+      flex: 1,
+      padding: "12px 4px",
+      border: "none",
+      background: "none",
+      color: active ? cor : "#64748b",
+      fontSize: 11,
+      letterSpacing: 1,
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3,
+      borderTop: active ? `2px solid ${cor}` : "2px solid transparent",
+      transition: "all 0.2s",
+    }),
+    timerPanel: {
+      position: "fixed",
+      left: 12,
+      right: 12,
+      bottom: 76,
+      zIndex: 90,
+      background: "#0d1117f2",
+      border: `1px solid ${timer.remaining === 0 ? "#34d399" : p.corBorder}`,
+      borderRadius: 8,
+      padding: 12,
+      boxShadow: "0 14px 40px #00000066",
+      backdropFilter: "blur(10px)",
+    },
+    timerBtn: {
+      background: "#111827",
+      color: "#e2e8f0",
+      border: "1px solid #243044",
+      borderRadius: 6,
+      padding: "8px 10px",
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      fontWeight: 700,
+    },
+  };
+
+  return (
+    <div style={S.app}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&display=swap'); * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #080c14; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #080c14; } ::-webkit-scrollbar-thumb { background: #1e2938; border-radius: 4px; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
+
+      <div style={S.header}>
+        <span style={S.pill(p.cor)}>
+          {p.icon} {p.nome}
+        </span>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#f8fafc" }}>Planos de Treino</h1>
+        <p style={{ margin: "4px 0 0", fontSize: 14, color: "#94a3b8" }}>{p.subtitulo}</p>
+      </div>
+
+      <div style={{ padding: "12px 16px 0", display: "flex", gap: 8 }}>
+        {Object.values(planos).map((pl) => (
+          <button
+            key={pl.id}
+            style={{
+              flex: 1,
+              padding: "12px 4px",
+              background: planoAtivo === pl.id ? `${pl.cor}22` : "#0d1117",
+              border: `1px solid ${planoAtivo === pl.id ? pl.cor : "#1e2938"}`,
+              borderRadius: 8,
+              color: planoAtivo === pl.id ? pl.cor : "#64748b",
+              fontSize: 12,
+              letterSpacing: 1,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "all 0.2s",
+            }}
+            onClick={() => {
+              setPlanoAtivo(pl.id);
+              setDiaAberto(null);
+            }}
+          >
+            <div style={{ fontSize: 22, marginBottom: 4 }}>{pl.icon}</div>
+            {pl.nome}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "12px 16px 0", display: "flex", gap: 6 }}>
+        {[
+          ["planos", "Exercicios"],
+          ["cronograma", "Cronograma"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            style={{
+              padding: "9px 16px",
+              borderRadius: 20,
+              background: tab === id ? `${p.cor}22` : "none",
+              border: `1px solid ${tab === id ? p.cor : "#1e2938"}`,
+              color: tab === id ? p.cor : "#64748b",
+              fontSize: 13,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              letterSpacing: 1,
+            }}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          style={{ ...S.btnGhost, marginLeft: "auto", fontSize: 13 }}
+          onClick={() => {
+            if (window.confirm("Resetar este plano para o padrao?")) resetPlano(planoAtivo);
+          }}
+        >
+          Reset
+        </button>
+      </div>
+
+      {tab === "planos" && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
+            <p style={{ margin: "0 0 10px", fontSize: 14, color: "#94a3b8", lineHeight: 1.6 }}>{p.descricao}</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {Object.entries(p.parametros).map(([k, v]) => (
+                <span key={k} style={S.badge(p.cor)}>
+                  {k}: {v}
+                </span>
+              ))}
+            </div>
+            <button style={{ ...S.btn(p.corBorder), width: "100%", marginTop: 12 }} onClick={() => startTimer(descansoPadrao, `Descanso ${p.nome}`)}>
+              Iniciar descanso padrao - {formatSeconds(descansoPadrao)}
+            </button>
+          </div>
+
+          {p.dias.map((dia, diaIdx) => (
+            <div key={dia.dia} style={S.diaCard(diaAberto === diaIdx)}>
+              <div style={S.diaHeader} onClick={() => setDiaAberto(diaAberto === diaIdx ? null : diaIdx)}>
+                <div>
+                  <span style={{ ...S.badge(p.cor), marginRight: 8 }}>DIA {dia.dia}</span>
+                  <span style={{ fontSize: 14, color: "#94a3b8" }}>{dia.label}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: "#64748b" }}>{dia.exercicios.length} ex.</span>
+                  <span style={{ color: p.cor, fontSize: 16 }}>{diaAberto === diaIdx ? "▲" : "▼"}</span>
+                </div>
+              </div>
+
+              {diaAberto === diaIdx && (
+                <div>
+                  {dia.exercicios.map((ex, exIdx) => (
+                    <div key={ex.id} style={S.exRow}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: "0 0 6px", fontSize: 15, color: "#f1f5f9", fontWeight: 500 }}>{ex.nome}</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: ex.obs ? 6 : 0 }}>
+                          <span style={S.badge("#22d3ee")}>{ex.series} series</span>
+                          <span style={S.badge("#a78bfa")}>{ex.reps} reps</span>
+                          {ex.carga && <span style={S.badge("#f97316")}>{ex.carga}</span>}
+                        </div>
+                        {ex.obs && <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5, fontStyle: "italic" }}>{ex.obs}</p>}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14 }} onClick={() => startEdit(planoAtivo, diaIdx, exIdx)}>
+                          Editar
+                        </button>
+                        <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: p.cor }} onClick={() => startTimer(descansoPadrao, ex.nome)}>
+                          Timer
+                        </button>
+                        <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: "#ef4444" }} onClick={() => removeExercicio(planoAtivo, diaIdx, exIdx)}>
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ padding: "12px 16px 16px" }}>
+                    <button style={{ ...S.btn(p.corBorder), width: "100%", opacity: 0.85 }} onClick={() => addExercicio(planoAtivo, diaIdx)}>
+                      + Adicionar Exercicio
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "cronograma" && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={S.card}>
+            <p style={{ ...S.label, marginBottom: 12 }}>Progressao sugerida - 16 semanas</p>
+            {[
+              { semanas: "1-4", plano: "ADAPTACAO", cor: "#22d3ee", icon: "↻", desc: "Reativacao, tecnica, volume baixo. Cargas 60-70%." },
+              { semanas: "5-10", plano: "MANUTENCAO", cor: "#a78bfa", icon: "◆", desc: "Hipertrofia controlada, progressao linear. 70-80%." },
+              { semanas: "11-16", plano: "QUEIMA", cor: "#f97316", icon: "▲", desc: "Alto volume, supersets, HIIT integrado. Deficit leve." },
+            ].map((item, i) => (
+              <div key={item.plano} style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: 42, height: 42, borderRadius: "50%", background: `${item.cor}22`, border: `2px solid ${item.cor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{item.icon}</div>
+                  {i < 2 && <div style={{ width: 2, height: 24, background: "#1e2938", margin: "4px 0" }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                    <span style={S.badge(item.cor)}>SEM {item.semanas}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: item.cor }}>{item.plano}</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, marginBottom: 12 }}>Semana-tipo - 4 dias</p>
+            {[
+              { dia: "SEG", label: "Treino A", sub: "Peito + Triceps", cor: "#f97316" },
+              { dia: "TER", label: "Treino B", sub: "Costas + Biceps", cor: "#a78bfa" },
+              { dia: "QUA", label: "Descanso Ativo", sub: "Caminhada 30min ou alongamento", cor: "#64748b" },
+              { dia: "QUI", label: "Treino C", sub: "Pernas + Gluteos", cor: "#22d3ee" },
+              { dia: "SEX", label: "Treino D", sub: "Ombros + Core", cor: "#34d399" },
+              { dia: "SAB", label: "Descanso", sub: "Recuperacao total", cor: "#64748b" },
+              { dia: "DOM", label: "Descanso", sub: "Recuperacao total", cor: "#64748b" },
+            ].map((item) => (
+              <div key={item.dia} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <span style={{ ...S.badge(item.cor), width: 48, justifyContent: "center" }}>{item.dia}</span>
+                <div>
+                  <p style={{ margin: 0, fontSize: 14, color: "#f1f5f9" }}>{item.label}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>{item.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ ...S.card, borderColor: "#22d3ee33" }}>
+            <p style={{ ...S.label, color: "#22d3ee" }}>Dicas de progressao</p>
+            {[
+              "Aumente 2.5-5kg quando completar todas as series/reps na forma correta.",
+              "Se nao completar 2/3 das series, mantenha a carga por mais uma semana.",
+              "Deload a cada 4-6 semanas: reduza volume em 40% por 1 semana.",
+              "Priorize sono (7-9h) e proteina (1.8-2.2g/kg de peso corporal).",
+              "Fase de queima: nao reduza carga; reduza descanso e aumente volume.",
+            ].map((tip) => (
+              <p key={tip} style={{ margin: "0 0 8px", fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+                <span style={{ color: "#22d3ee" }}>▸ </span>
+                {tip}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "coach" && (
+        <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column" }}>
+          {aiMessages.length === 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ ...S.label, color: "#a78bfa", marginBottom: 10 }}>Coach IA personalizado</p>
+              <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 14px", lineHeight: 1.6 }}>Seu coach conhece seus 3 planos e responde duvidas sobre treino, progressao e execucao.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  "Estou na semana 1 - como devo controlar as cargas no plano de Adaptacao?",
+                  "Qual a diferenca entre os 3 planos e como sei que estou pronto para avancar?",
+                  "Como faco os supersets do plano de Queima sem perder a forma?",
+                  "Preciso de suplementacao para esses 3 planos?",
+                ].map((q) => (
+                  <button key={q} style={{ ...S.btnGhost, textAlign: "left", lineHeight: 1.5, padding: "10px 14px", fontSize: 13, color: "#94a3b8" }} onClick={() => askAI(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+            {aiMessages.map((m, i) => (
+              <div key={`${m.role}-${i}`} style={{ display: "flex", gap: 8, flexDirection: m.role === "user" ? "row-reverse" : "row", alignItems: "flex-start" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, background: m.role === "user" ? "#1e2938" : "#2e1065", border: `1px solid ${m.role === "user" ? "#334155" : "#7c3aed"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                  {m.role === "user" ? "EU" : "AI"}
+                </div>
+                <div style={{ background: m.role === "user" ? "#1e2938" : "#0d1117", border: `1px solid ${m.role === "user" ? "#334155" : "#7c3aed44"}`, borderRadius: m.role === "user" ? "8px 4px 8px 8px" : "4px 8px 8px 8px", padding: "10px 14px", maxWidth: "80%", fontSize: 13, color: "#e2e8f0", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {aiLoading && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#2e1065", border: "1px solid #7c3aed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>AI</div>
+                <div style={{ background: "#0d1117", border: "1px solid #7c3aed44", borderRadius: "4px 8px 8px 8px", padding: "12px 16px" }}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: "#a78bfa", animation: "pulse 1.2s ease-in-out infinite", animationDelay: `${i * 0.2}s` }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: "sticky", bottom: 80, background: "#080c14", paddingBottom: 8, paddingTop: 4 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <textarea
+                style={{ ...S.input, flex: 1, minHeight: 44, maxHeight: 120, resize: "none", padding: "12px 14px", lineHeight: 1.4 }}
+                placeholder="Pergunte ao coach..."
+                value={aiInput}
+                rows={1}
+                onChange={(e) => setAiInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    askAI();
+                  }
+                }}
+              />
+              <button style={{ ...S.btn("#7c3aed"), padding: "12px 16px", flexShrink: 0, opacity: aiLoading ? 0.5 : 1 }} onClick={() => askAI()} disabled={aiLoading}>
+                Enviar
+              </button>
+            </div>
+            {aiMessages.length > 0 && (
+              <button style={{ ...S.btnGhost, marginTop: 6, fontSize: 11, width: "100%" }} onClick={() => setAiMessages([])}>
+                Limpar conversa
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {editando && (
+        <div style={{ position: "fixed", inset: 0, background: "#000000dd", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "#0d1117", border: `1px solid ${p.corBorder}`, borderRadius: "8px 8px 0 0", padding: 20, width: "100%", maxHeight: "80vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 17, color: p.cor }}>Editar Exercicio</h3>
+              <button style={{ ...S.btnGhost, padding: "6px 12px", fontSize: 15 }} onClick={() => setEditando(null)}>
+                Fechar
+              </button>
+            </div>
+
+            <label style={S.label}>Nome do exercicio</label>
+            <input style={{ ...S.input, marginBottom: 12 }} value={editForm.nome || ""} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} />
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <div>
+                <label style={S.label}>Series</label>
+                <input style={S.input} type="number" value={editForm.series || ""} onChange={(e) => setEditForm((f) => ({ ...f, series: e.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Repeticoes</label>
+                <input style={S.input} value={editForm.reps || ""} onChange={(e) => setEditForm((f) => ({ ...f, reps: e.target.value }))} />
+              </div>
+            </div>
+
+            <label style={S.label}>Carga atual (kg)</label>
+            <input style={{ ...S.input, marginBottom: 12 }} placeholder="Ex: 40kg" value={editForm.carga || ""} onChange={(e) => setEditForm((f) => ({ ...f, carga: e.target.value }))} />
+
+            <label style={S.label}>Observacoes / notas</label>
+            <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 18 }} value={editForm.obs || ""} onChange={(e) => setEditForm((f) => ({ ...f, obs: e.target.value }))} />
+
+            <button style={{ ...S.btn(p.cor), width: "100%" }} onClick={saveEdit}>
+              Salvar alteracoes
+            </button>
+          </div>
+        </div>
+      )}
+
+      <section style={S.timerPanel} aria-label="Timer de descanso">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer de descanso</p>
+            <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.label}</p>
+          </div>
+          <strong style={{ color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 28, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
+        </div>
+
+        <div style={{ height: 6, background: "#1e2938", borderRadius: 999, overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ width: `${timerPercent}%`, height: "100%", background: timer.remaining === 0 ? "#34d399" : p.cor, transition: "width 0.25s linear" }} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
+          <button style={S.timerBtn} onClick={() => adjustTimer(-15)}>-15s</button>
+          <button style={S.timerBtn} onClick={toggleTimer}>{timer.running ? "Pausar" : timer.remaining === 0 ? "Repetir" : "Iniciar"}</button>
+          <button style={S.timerBtn} onClick={() => startTimer(descansoPadrao, `Descanso ${p.nome}`)}>{formatSeconds(descansoPadrao)}</button>
+          <button style={S.timerBtn} onClick={() => adjustTimer(15)}>+15s</button>
+          <button style={{ ...S.timerBtn, color: "#ef4444" }} onClick={() => setTimer((current) => ({ ...current, remaining: current.duration, running: false }))}>Reset</button>
+        </div>
+      </section>
+
+      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#080c14", borderTop: "1px solid #1e2938", display: "flex", zIndex: 100 }}>
+        {Object.values(planos).map((pl) => (
+          <button
+            key={pl.id}
+            style={S.navBtn(planoAtivo === pl.id && tab !== "coach", pl.cor)}
+            onClick={() => {
+              setPlanoAtivo(pl.id);
+              setDiaAberto(null);
+              setTab("planos");
+            }}
+          >
+            <span style={{ fontSize: 22 }}>{pl.icon}</span>
+            <span>{pl.nome}</span>
+          </button>
+        ))}
+        <button style={S.navBtn(tab === "coach", "#a78bfa")} onClick={() => setTab("coach")}>
+          <span style={{ fontSize: 22 }}>AI</span>
+          <span>COACH</span>
+        </button>
+      </nav>
+    </div>
+  );
+}
