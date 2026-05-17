@@ -193,17 +193,93 @@ const PLANOS_BASE = {
 };
 
 const STORAGE_KEY = "planos_treino_v2";
+const DEFAULT_REST_SECONDS = 50;
+const WEEK_LABELS = [
+  { dia: "A", prefix: "Dom", nome: "Domingo" },
+  { dia: "B", prefix: "Seg", nome: "Segunda" },
+  { dia: "C", prefix: "Ter", nome: "Terca" },
+  { dia: "D", prefix: "Qua", nome: "Quarta" },
+];
 
 function cloneBase() {
   return JSON.parse(JSON.stringify(PLANOS_BASE));
 }
 
+function getExtraDay(planoId) {
+  const extras = {
+    adaptacao: {
+      dia: "E",
+      label: "Sex - Full Body + Cardio leve",
+      grupos: ["Full Body", "Cardio"],
+      exercicios: [
+        { id: "e1", nome: "Circuito Tecnico Full Body", series: 3, reps: "12 cada", carga: "", cargaNotas: "", obs: "Agachamento goblet, remada baixa e flexao inclinada com tecnica limpa" },
+        { id: "e2", nome: "Mobilidade de Quadril e Ombros", series: 3, reps: "40s", carga: "", cargaNotas: "", obs: "Amplitude confortavel, sem dor articular" },
+        { id: "e3", nome: "Cardio Zona 2", series: 1, reps: "20 min", carga: "", cargaNotas: "", obs: "Ritmo sustentavel, respiracao controlada" },
+      ],
+    },
+    manutencao: {
+      dia: "E",
+      label: "Sex - Full Body + Pontos fracos",
+      grupos: ["Full Body", "Cardio"],
+      exercicios: [
+        { id: "me1", nome: "Levantamento Terra Romeno", series: 4, reps: "8-10", carga: "", cargaNotas: "", obs: "Posterior e gluteo, coluna neutra" },
+        { id: "me2", nome: "Supino Fechado ou Flexao com Carga", series: 3, reps: "10-12", carga: "", cargaNotas: "", obs: "Triceps e peitoral, sem perder controle escapular" },
+        { id: "me3", nome: "Remada Baixa Neutra", series: 3, reps: "10-12", carga: "", cargaNotas: "", obs: "Puxar cotovelos para tras, pausa curta na contracao" },
+        { id: "me4", nome: "Cardio Moderado", series: 1, reps: "15 min", carga: "", cargaNotas: "", obs: "Bike, esteira ou eliptico em ritmo controlado" },
+      ],
+    },
+    queima: {
+      dia: "E",
+      label: "Sex - Metabolico + Core",
+      grupos: ["Full Body", "Abdomen"],
+      exercicios: [
+        { id: "qe1", nome: "Circuito Metabolico: Remo + Agacho + Push Press", series: 4, reps: "12 + 12 + 10", carga: "", cargaNotas: "", obs: "Descanso curto, manter forma mesmo em fadiga" },
+        { id: "qe2", nome: "Farmer Walk", series: 4, reps: "40m", carga: "", cargaNotas: "", obs: "Tronco firme, passos curtos e controlados" },
+        { id: "qe3", nome: "Core Anti-rotacao na Polia", series: 3, reps: "12 cada", carga: "", cargaNotas: "", obs: "Pallof press, segurar 1s na extensao" },
+        { id: "qe4", nome: "HIIT Bike", series: 1, reps: "12 min", carga: "", cargaNotas: "", obs: "30s forte / 60s leve" },
+      ],
+    },
+  };
+
+  return JSON.parse(JSON.stringify(extras[planoId] || extras.adaptacao));
+}
+
+function normalizePlanos(data) {
+  const planos = JSON.parse(JSON.stringify(data || PLANOS_BASE));
+
+  Object.values(planos).forEach((plano) => {
+    plano.parametros = { ...plano.parametros, descanso: "50s" };
+    plano.dias = Array.isArray(plano.dias) ? plano.dias : [];
+
+    WEEK_LABELS.forEach((week, index) => {
+      if (!plano.dias[index]) return;
+      const parts = String(plano.dias[index].label || "").split(" - ");
+      const treino = parts[1] || plano.dias[index].label || `Treino ${week.dia}`;
+      plano.dias[index].dia = week.dia;
+      plano.dias[index].label = `${week.prefix} - ${treino}`;
+    });
+
+    if (!plano.dias.some((dia) => dia.dia === "E")) {
+      plano.dias.push(getExtraDay(plano.id));
+    }
+
+    plano.dias.forEach((dia) => {
+      dia.exercicios = (dia.exercicios || []).map((ex) => ({
+        cargaNotas: "",
+        ...ex,
+      }));
+    });
+  });
+
+  return planos;
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : cloneBase();
+    return normalizePlanos(raw ? JSON.parse(raw) : cloneBase());
   } catch {
-    return cloneBase();
+    return normalizePlanos(cloneBase());
   }
 }
 
@@ -217,7 +293,7 @@ function save(d) {
 
 function secondsFromRest(rest) {
   const values = String(rest).match(/\d+/g)?.map(Number) || [];
-  return values.length ? Math.max(...values) : 60;
+  return values.length ? Math.max(...values) : DEFAULT_REST_SECONDS;
 }
 
 function formatSeconds(total) {
@@ -236,21 +312,46 @@ export default function PlanosTreino() {
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [treinoAtivo, setTreinoAtivo] = useState(false);
+  const [seriesConcluidas, setSeriesConcluidas] = useState({});
+  const [timerX, setTimerX] = useState(12);
+  const [timerDrag, setTimerDrag] = useState(null);
   const [timer, setTimer] = useState({
-    duration: 60,
-    remaining: 60,
+    duration: DEFAULT_REST_SECONDS,
+    remaining: DEFAULT_REST_SECONDS,
     running: false,
     label: "Descanso",
+    targetKey: null,
+    autoCompletePending: false,
   });
 
   const persist = (updated) => {
-    setPlanos(updated);
-    save(updated);
+    const normalized = normalizePlanos(updated);
+    setPlanos(normalized);
+    save(normalized);
   };
 
   const plano = planos[planoAtivo];
-  const descansoPadrao = secondsFromRest(plano.parametros.descanso);
+  const descansoPadrao = DEFAULT_REST_SECONDS;
   const timerPercent = timer.duration ? Math.max(0, Math.min(100, (timer.remaining / timer.duration) * 100)) : 0;
+
+  const exerciseKey = (planoId, diaIdx, exIdx) => `${planoId}:${diaIdx}:${exIdx}`;
+
+  const getCompletedSeries = (key) => seriesConcluidas[key] || 0;
+
+  const completeSeries = (key, maxSeries = 99) => {
+    if (!key) return;
+    setSeriesConcluidas((current) => ({
+      ...current,
+      [key]: Math.min(maxSeries, (current[key] || 0) + 1),
+    }));
+  };
+
+  const updateExercicioField = (planoId, diaIdx, exIdx, field, value) => {
+    const updated = JSON.parse(JSON.stringify(planos));
+    updated[planoId].dias[diaIdx].exercicios[exIdx][field] = value;
+    persist(updated);
+  };
 
   useEffect(() => {
     if (!timer.running) return undefined;
@@ -258,7 +359,7 @@ export default function PlanosTreino() {
     const interval = window.setInterval(() => {
       setTimer((current) => {
         if (current.remaining <= 1) {
-          return { ...current, remaining: 0, running: false };
+          return { ...current, remaining: 0, running: false, autoCompletePending: Boolean(current.targetKey) };
         }
 
         return { ...current, remaining: current.remaining - 1 };
@@ -268,18 +369,72 @@ export default function PlanosTreino() {
     return () => window.clearInterval(interval);
   }, [timer.running]);
 
-  const startTimer = (seconds = descansoPadrao, label = "Descanso") => {
+  useEffect(() => {
+    if (!timer.autoCompletePending || !timer.targetKey) return;
+    const [, diaIdx, exIdx] = timer.targetKey.split(":");
+    const ex = plano.dias[Number(diaIdx)]?.exercicios[Number(exIdx)];
+    completeSeries(timer.targetKey, Number(ex?.series) || 99);
+    setTimer((current) => ({ ...current, autoCompletePending: false }));
+  }, [timer.autoCompletePending, timer.targetKey, plano.dias]);
+
+  useEffect(() => {
+    if (!timerDrag) return undefined;
+
+    const move = (event) => {
+      const panelWidth = 320;
+      const maxX = Math.max(12, window.innerWidth - panelWidth - 12);
+      const nextX = timerDrag.startX + event.clientX - timerDrag.pointerX;
+      setTimerX(Math.max(12, Math.min(maxX, nextX)));
+    };
+
+    const stop = () => setTimerDrag(null);
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+  }, [timerDrag]);
+
+  const startTimer = (seconds = descansoPadrao, label = "Descanso", targetKey = null) => {
     setTimer({
       duration: seconds,
       remaining: seconds,
       running: true,
       label,
+      targetKey,
+      autoCompletePending: false,
     });
+  };
+
+  const suggestRestTimer = (label = "Descanso sugerido", targetKey = null) => {
+    setTimer({
+      duration: descansoPadrao,
+      remaining: descansoPadrao,
+      running: false,
+      label,
+      targetKey,
+      autoCompletePending: false,
+    });
+  };
+
+  const iniciarTreino = () => {
+    setTreinoAtivo(true);
+    setSeriesConcluidas({});
+    setDiaAberto(0);
+    suggestRestTimer(`Descanso sugerido - ${plano.nome}`);
+  };
+
+  const encerrarTreino = () => {
+    setTreinoAtivo(false);
+    setTimer((current) => ({ ...current, running: false }));
   };
 
   const toggleTimer = () => {
     if (timer.remaining === 0) {
-      startTimer(timer.duration || descansoPadrao, timer.label);
+      startTimer(timer.duration || descansoPadrao, timer.label, timer.targetKey);
       return;
     }
 
@@ -317,6 +472,7 @@ export default function PlanosTreino() {
       series: 3,
       reps: "12",
       carga: "",
+      cargaNotas: "",
       obs: "",
     });
     persist(updated);
@@ -330,7 +486,7 @@ export default function PlanosTreino() {
 
   const resetPlano = (planoId) => {
     const updated = JSON.parse(JSON.stringify(planos));
-    updated[planoId] = JSON.parse(JSON.stringify(PLANOS_BASE[planoId]));
+    updated[planoId] = normalizePlanos({ [planoId]: PLANOS_BASE[planoId] })[planoId];
     persist(updated);
   };
 
@@ -366,9 +522,9 @@ export default function PlanosTreino() {
       minHeight: "100vh",
       background: "#080c14",
       color: "#e2e8f0",
-      fontFamily: "'DM Mono', 'Fira Code', 'Courier New', monospace",
-      paddingBottom: 170,
-      fontSize: 16,
+      fontFamily: "Arial, Helvetica, sans-serif",
+      paddingBottom: 270,
+      fontSize: 17,
     },
     header: {
       background: `linear-gradient(160deg, ${p.corBg} 0%, #0d1117 60%)`,
@@ -383,7 +539,7 @@ export default function PlanosTreino() {
       border: `1px solid ${cor}44`,
       borderRadius: 20,
       padding: "5px 14px",
-      fontSize: 13,
+      fontSize: 14,
       letterSpacing: 2,
       textTransform: "uppercase",
       marginBottom: 6,
@@ -427,7 +583,7 @@ export default function PlanosTreino() {
       border: `1px solid ${cor}44`,
       borderRadius: 6,
       padding: "4px 10px",
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: 700,
       whiteSpace: "nowrap",
     }),
@@ -438,7 +594,7 @@ export default function PlanosTreino() {
       borderRadius: 8,
       padding: "13px 18px",
       fontWeight: 700,
-      fontSize: 14,
+      fontSize: 15,
       letterSpacing: 1,
       cursor: "pointer",
       fontFamily: "inherit",
@@ -449,7 +605,7 @@ export default function PlanosTreino() {
       border: "1px solid #1e2938",
       borderRadius: 6,
       padding: "8px 12px",
-      fontSize: 13,
+      fontSize: 14,
       cursor: "pointer",
       fontFamily: "inherit",
     },
@@ -459,14 +615,14 @@ export default function PlanosTreino() {
       borderRadius: 8,
       padding: "12px 14px",
       color: "#e2e8f0",
-      fontSize: 15,
+      fontSize: 16,
       width: "100%",
       boxSizing: "border-box",
       fontFamily: "inherit",
       outline: "none",
     },
     label: {
-      fontSize: 12,
+      fontSize: 13,
       color: "#64748b",
       letterSpacing: 2,
       textTransform: "uppercase",
@@ -479,7 +635,7 @@ export default function PlanosTreino() {
       border: "none",
       background: "none",
       color: active ? cor : "#64748b",
-      fontSize: 11,
+      fontSize: 12,
       letterSpacing: 1,
       cursor: "pointer",
       display: "flex",
@@ -491,10 +647,10 @@ export default function PlanosTreino() {
     }),
     timerPanel: {
       position: "fixed",
-      left: 12,
-      right: 12,
+      left: timerX,
       bottom: 76,
       zIndex: 90,
+      width: "min(320px, calc(100vw - 24px))",
       background: "#0d1117f2",
       border: `1px solid ${timer.remaining === 0 ? "#34d399" : p.corBorder}`,
       borderRadius: 8,
@@ -508,7 +664,7 @@ export default function PlanosTreino() {
       border: "1px solid #243044",
       borderRadius: 6,
       padding: "8px 10px",
-      fontSize: 12,
+      fontSize: 13,
       cursor: "pointer",
       fontFamily: "inherit",
       fontWeight: 700,
@@ -517,14 +673,14 @@ export default function PlanosTreino() {
 
   return (
     <div style={S.app}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&display=swap'); * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #080c14; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #080c14; } ::-webkit-scrollbar-thumb { background: #1e2938; border-radius: 4px; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
+      <style>{`* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #080c14; font-family: Arial, Helvetica, sans-serif; } button, input, textarea { font-family: Arial, Helvetica, sans-serif; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #080c14; } ::-webkit-scrollbar-thumb { background: #1e2938; border-radius: 4px; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
 
       <div style={S.header}>
         <span style={S.pill(p.cor)}>
           {p.icon} {p.nome}
         </span>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#f8fafc" }}>Planos de Treino</h1>
-        <p style={{ margin: "4px 0 0", fontSize: 14, color: "#94a3b8" }}>{p.subtitulo}</p>
+        <h1 style={{ margin: 0, fontSize: 29, fontWeight: 700, color: "#f8fafc" }}>Planos de Treino</h1>
+        <p style={{ margin: "4px 0 0", fontSize: 15, color: "#94a3b8" }}>{p.subtitulo}</p>
       </div>
 
       <div style={{ padding: "12px 16px 0", display: "flex", gap: 8 }}>
@@ -604,6 +760,25 @@ export default function PlanosTreino() {
             </button>
           </div>
 
+          <div style={{ ...S.card, borderColor: treinoAtivo ? `${p.cor}88` : "#1e2938" }}>
+            <p style={{ ...S.label, color: treinoAtivo ? p.cor : "#64748b" }}>{treinoAtivo ? "Treino em andamento" : "Sessao de treino"}</p>
+            <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+              {treinoAtivo
+                ? "Ao finalizar um timer iniciado em um exercicio, uma serie sera marcada automaticamente."
+                : "Inicie o treino para acompanhar as series concluidas e usar o descanso sugerido de 50s."}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: treinoAtivo ? "1fr 1fr" : "1fr", gap: 8 }}>
+              <button style={{ ...S.btn(treinoAtivo ? "#334155" : p.corBorder), width: "100%" }} onClick={treinoAtivo ? encerrarTreino : iniciarTreino}>
+                {treinoAtivo ? "Encerrar Treino" : "Iniciar Treino"}
+              </button>
+              {treinoAtivo && (
+                <button style={{ ...S.btn(p.cor), width: "100%" }} onClick={() => suggestRestTimer(`Descanso sugerido - ${p.nome}`)}>
+                  Sugerir Timer - {formatSeconds(descansoPadrao)}
+                </button>
+              )}
+            </div>
+          </div>
+
           {p.dias.map((dia, diaIdx) => (
             <div key={dia.dia} style={S.diaCard(diaAberto === diaIdx)}>
               <div style={S.diaHeader} onClick={() => setDiaAberto(diaAberto === diaIdx ? null : diaIdx)}>
@@ -619,30 +794,49 @@ export default function PlanosTreino() {
 
               {diaAberto === diaIdx && (
                 <div>
-                  {dia.exercicios.map((ex, exIdx) => (
+                  {dia.exercicios.map((ex, exIdx) => {
+                    const key = exerciseKey(planoAtivo, diaIdx, exIdx);
+                    const done = getCompletedSeries(key);
+                    const totalSeries = Number(ex.series) || 0;
+
+                    return (
                     <div key={ex.id} style={S.exRow}>
                       <div style={{ flex: 1 }}>
-                        <p style={{ margin: "0 0 6px", fontSize: 15, color: "#f1f5f9", fontWeight: 500 }}>{ex.nome}</p>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: ex.obs ? 6 : 0 }}>
+                        <p style={{ margin: "0 0 6px", fontSize: 16, color: "#f1f5f9", fontWeight: 700 }}>{ex.nome}</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: ex.obs ? 6 : 8 }}>
                           <span style={S.badge("#22d3ee")}>{ex.series} series</span>
                           <span style={S.badge("#a78bfa")}>{ex.reps} reps</span>
                           {ex.carga && <span style={S.badge("#f97316")}>{ex.carga}</span>}
+                          {treinoAtivo && <span style={S.badge(done >= totalSeries && totalSeries > 0 ? "#34d399" : "#64748b")}>{done}/{ex.series} feitas</span>}
                         </div>
-                        {ex.obs && <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5, fontStyle: "italic" }}>{ex.obs}</p>}
+                        {ex.obs && <p style={{ margin: "0 0 10px", fontSize: 14, color: "#64748b", lineHeight: 1.5, fontStyle: "italic" }}>{ex.obs}</p>}
+                        <label style={{ ...S.label, marginTop: 4 }}>Observacoes de carga / progressao</label>
+                        <textarea
+                          style={{ ...S.input, minHeight: 64, resize: "vertical", fontSize: 15 }}
+                          placeholder="Ex: 20kg cada halter; proxima meta 22kg; RPE 8"
+                          value={ex.cargaNotas || ""}
+                          onChange={(event) => updateExercicioField(planoAtivo, diaIdx, exIdx, "cargaNotas", event.target.value)}
+                        />
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14 }} onClick={() => startEdit(planoAtivo, diaIdx, exIdx)}>
                           Editar
                         </button>
-                        <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: p.cor }} onClick={() => startTimer(descansoPadrao, ex.nome)}>
+                        <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: p.cor }} onClick={() => startTimer(descansoPadrao, ex.nome, key)}>
                           Timer
                         </button>
+                        {treinoAtivo && (
+                          <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: "#34d399" }} onClick={() => completeSeries(key, totalSeries || 99)}>
+                            Serie +
+                          </button>
+                        )}
                         <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: "#ef4444" }} onClick={() => removeExercicio(planoAtivo, diaIdx, exIdx)}>
                           Excluir
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   <div style={{ padding: "12px 16px 16px" }}>
                     <button style={{ ...S.btn(p.corBorder), width: "100%", opacity: 0.85 }} onClick={() => addExercicio(planoAtivo, diaIdx)}>
                       + Adicionar Exercicio
@@ -681,15 +875,15 @@ export default function PlanosTreino() {
           </div>
 
           <div style={S.card}>
-            <p style={{ ...S.label, marginBottom: 12 }}>Semana-tipo - 4 dias</p>
+            <p style={{ ...S.label, marginBottom: 12 }}>Semana-tipo - 5 dias</p>
             {[
-              { dia: "SEG", label: "Treino A", sub: "Peito + Triceps", cor: "#f97316" },
-              { dia: "TER", label: "Treino B", sub: "Costas + Biceps", cor: "#a78bfa" },
-              { dia: "QUA", label: "Descanso Ativo", sub: "Caminhada 30min ou alongamento", cor: "#64748b" },
-              { dia: "QUI", label: "Treino C", sub: "Pernas + Gluteos", cor: "#22d3ee" },
-              { dia: "SEX", label: "Treino D", sub: "Ombros + Core", cor: "#34d399" },
+              { dia: "DOM", label: "Treino A", sub: "Peito + Triceps", cor: "#f97316" },
+              { dia: "SEG", label: "Treino B", sub: "Costas + Biceps", cor: "#a78bfa" },
+              { dia: "TER", label: "Treino C", sub: "Pernas + Gluteos", cor: "#22d3ee" },
+              { dia: "QUA", label: "Treino D", sub: "Ombros + Core", cor: "#34d399" },
+              { dia: "QUI", label: "Descanso Ativo", sub: "Caminhada 30min ou mobilidade", cor: "#64748b" },
+              { dia: "SEX", label: "Treino E", sub: "Full body + cardio", cor: "#f97316" },
               { dia: "SAB", label: "Descanso", sub: "Recuperacao total", cor: "#64748b" },
-              { dia: "DOM", label: "Descanso", sub: "Recuperacao total", cor: "#64748b" },
             ].map((item) => (
               <div key={item.dia} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <span style={{ ...S.badge(item.cor), width: 48, justifyContent: "center" }}>{item.dia}</span>
@@ -820,6 +1014,14 @@ export default function PlanosTreino() {
             <label style={S.label}>Carga atual (kg)</label>
             <input style={{ ...S.input, marginBottom: 12 }} placeholder="Ex: 40kg" value={editForm.carga || ""} onChange={(e) => setEditForm((f) => ({ ...f, carga: e.target.value }))} />
 
+            <label style={S.label}>Observacoes de carga / progressao</label>
+            <textarea
+              style={{ ...S.input, minHeight: 74, resize: "vertical", marginBottom: 12 }}
+              placeholder="Ex: 20kg cada halter; 3x12 limpo; subir carga na proxima semana"
+              value={editForm.cargaNotas || ""}
+              onChange={(e) => setEditForm((f) => ({ ...f, cargaNotas: e.target.value }))}
+            />
+
             <label style={S.label}>Observacoes / notas</label>
             <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 18 }} value={editForm.obs || ""} onChange={(e) => setEditForm((f) => ({ ...f, obs: e.target.value }))} />
 
@@ -831,10 +1033,14 @@ export default function PlanosTreino() {
       )}
 
       <section style={S.timerPanel} aria-label="Timer de descanso">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, cursor: timerDrag ? "grabbing" : "grab", userSelect: "none" }}
+          onPointerDown={(event) => setTimerDrag({ pointerX: event.clientX, startX: timerX })}
+        >
           <div style={{ minWidth: 0 }}>
             <p style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer de descanso</p>
-            <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.label}</p>
+            <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.label}</p>
+            <p style={{ margin: "2px 0 0", color: "#475569", fontSize: 12 }}>Arraste para esquerda ou direita</p>
           </div>
           <strong style={{ color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 28, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
         </div>
@@ -843,7 +1049,7 @@ export default function PlanosTreino() {
           <div style={{ width: `${timerPercent}%`, height: "100%", background: timer.remaining === 0 ? "#34d399" : p.cor, transition: "width 0.25s linear" }} />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
           <button style={S.timerBtn} onClick={() => adjustTimer(-15)}>-15s</button>
           <button style={S.timerBtn} onClick={toggleTimer}>{timer.running ? "Pausar" : timer.remaining === 0 ? "Repetir" : "Iniciar"}</button>
           <button style={S.timerBtn} onClick={() => startTimer(descansoPadrao, `Descanso ${p.nome}`)}>{formatSeconds(descansoPadrao)}</button>
