@@ -371,6 +371,7 @@ export default function PlanosTreino() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [seriesConcluidas, setSeriesConcluidas] = useState({});
   const [timerX, setTimerX] = useState(12);
+  const [timerY, setTimerY] = useState(null);
   const [timerDrag, setTimerDrag] = useState(null);
   const [timerMinimizado, setTimerMinimizado] = useState(false);
   const [sessionNow, setSessionNow] = useState(Date.now());
@@ -479,9 +480,13 @@ export default function PlanosTreino() {
 
     const move = (event) => {
       const panelWidth = 320;
+      const panelHeight = 340;
       const maxX = Math.max(12, window.innerWidth - panelWidth - 12);
+      const maxY = Math.max(12, window.innerHeight - panelHeight - 12);
       const nextX = timerDrag.startX + event.clientX - timerDrag.pointerX;
+      const nextY = timerDrag.startY + event.clientY - timerDrag.pointerY;
       setTimerX(Math.max(12, Math.min(maxX, nextX)));
+      setTimerY(Math.max(12, Math.min(maxY, nextY)));
     };
 
     const stop = () => setTimerDrag(null);
@@ -901,7 +906,7 @@ export default function PlanosTreino() {
     timerPanel: {
       position: "fixed",
       left: timerX,
-      bottom: 76,
+      ...(timerY === null ? { bottom: 76 } : { top: timerY }),
       zIndex: 90,
       width: "min(320px, calc(100vw - 24px))",
       background: "#0d1117f2",
@@ -1468,27 +1473,31 @@ export default function PlanosTreino() {
         >
           <span style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer</span>
           <strong style={{ display: "block", color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 26, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
-          <span style={{ display: "block", color: "#94a3b8", fontSize: 12 }}>Toque para abrir</span>
+          <span style={{ display: "block", color: "#94a3b8", fontSize: 12 }}>▴ Toque para expandir</span>
         </button>
       ) : (
         <section style={S.timerPanel} aria-label="Timer de descanso">
           <div
             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, cursor: timerDrag ? "grabbing" : "grab", userSelect: "none" }}
-            onPointerDown={(event) => setTimerDrag({ pointerX: event.clientX, startX: timerX })}
+            onPointerDown={(event) => {
+              const rect = event.currentTarget.parentElement.getBoundingClientRect();
+              setTimerDrag({ pointerX: event.clientX, pointerY: event.clientY, startX: timerX, startY: timerY ?? rect.top });
+            }}
           >
             <div style={{ minWidth: 0 }}>
               <p style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer de descanso</p>
               <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.label}</p>
-              <p style={{ margin: "2px 0 0", color: "#475569", fontSize: 12 }}>Arraste para esquerda ou direita</p>
+              <p style={{ margin: "2px 0 0", color: "#475569", fontSize: 12 }}>Arraste para mover</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <strong style={{ color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 28, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
               <button
-                style={{ ...S.timerBtn, padding: "6px 8px", fontSize: 12 }}
+                style={{ ...S.timerBtn, padding: "6px 10px", fontSize: 16, lineHeight: 1 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={() => setTimerMinimizado(true)}
+                title="Recolher"
               >
-                Min
+                ▾
               </button>
             </div>
           </div>
