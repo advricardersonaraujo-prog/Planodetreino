@@ -751,26 +751,73 @@ export default function PlanosTreino() {
   const askAI = async (msg) => {
     const userMsg = msg || aiInput.trim();
     if (!userMsg) return;
+
     const newMessages = [...aiMessages, { role: "user", text: userMsg }];
     setAiMessages(newMessages);
     setAiInput("");
     setAiLoading(true);
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      setAiMessages((prev) => [...prev, {
+        role: "assistant",
+        text: "⚠️ Chave da API Gemini não configurada.\n\nAdicione VITE_GEMINI_API_KEY no arquivo .env ou nas variáveis de ambiente do Vercel/Netlify.\n\nObttenha sua chave gratuita em: aistudio.google.com",
+      }]);
+      setAiLoading(false);
+      return;
+    }
 
     const planoResumo = Object.values(planos).map((pl) => ({
       plano: pl.nome,
       fase: pl.subtitulo,
       dias: pl.dias.map((d) => ({
         dia: d.label,
-        exercicios: d.exercicios.map((e) => `${e.nome} ${e.series}x${e.reps}${e.carga ? ` ${e.carga}` : ""}`),
+        exercicios: d.exercicios.map((e) => `${e.nome} ${e.series}x${e.reps}${e.carga ? ` ${e.carga}kg` : ""}`),
       })),
     }));
 
-    const reply = `✅ Boa pergunta. Para este app local, estou usando uma resposta offline porque chamadas diretas para APIs de IA no navegador precisam de uma chave protegida no servidor.\n\nPlano ativo: ${plano.nome}\nFase: ${plano.subtitulo}\n\n⚡ Use progressao conservadora: aumente carga apenas quando completar todas as series com tecnica limpa.\n⚠️ Se dor articular aparecer, reduza carga ou amplitude e priorize execucao.`;
+    const systemPrompt = `Você é um coach de treino personalizado e motivador. O usuário possui 3 planos de treino:
 
-    console.info("Resumo enviado ao coach offline:", planoResumo);
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    setAiMessages((prev) => [...prev, { role: "assistant", text: reply }]);
-    setAiLoading(false);
+${JSON.stringify(planoResumo, null, 2)}
+
+Plano ativo: ${plano.nome} — ${plano.subtitulo}
+
+Responda sempre em português, de forma direta, prática e motivadora. Foque em progressão de carga, técnica correta e segurança. Máximo 300 palavras por resposta.`;
+
+    const contents = newMessages.map((m) => ({
+      role: m.role === "user" ? "user" : "model",
+      parts: [{ text: m.text }],
+    }));
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+          }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text
+        || "Não consegui gerar uma resposta. Tente novamente.";
+      setAiMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+    } catch (err) {
+      setAiMessages((prev) => [...prev, {
+        role: "assistant",
+        text: `❌ Erro ao conectar com Gemini: ${err.message}`,
+      }]);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const p = plano;
@@ -1365,7 +1412,7 @@ export default function PlanosTreino() {
         <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column" }}>
           {aiMessages.length === 0 && (
             <div style={{ marginBottom: 12 }}>
-              <p style={{ ...S.label, color: "#a78bfa", marginBottom: 10 }}>Coach IA personalizado</p>
+              <p style={{ ...S.label, color: "#FACC15", marginBottom: 10 }}>Coach IA — Gemini</p>
               <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 14px", lineHeight: 1.6 }}>Seu coach conhece seus 3 planos e responde duvidas sobre treino, progressao e execucao.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
@@ -1385,21 +1432,21 @@ export default function PlanosTreino() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
             {aiMessages.map((m, i) => (
               <div key={`${m.role}-${i}`} style={{ display: "flex", gap: 8, flexDirection: m.role === "user" ? "row-reverse" : "row", alignItems: "flex-start" }}>
-                <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, background: m.role === "user" ? "#1e2938" : "#2e1065", border: `1px solid ${m.role === "user" ? "#334155" : "#7c3aed"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, background: m.role === "user" ? "#1e1e1e" : "#1a1500", border: `1px solid ${m.role === "user" ? "#333" : "#FACC1566"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
                   {m.role === "user" ? "EU" : "AI"}
                 </div>
-                <div style={{ background: m.role === "user" ? "#1e2938" : "#0d1117", border: `1px solid ${m.role === "user" ? "#334155" : "#7c3aed44"}`, borderRadius: m.role === "user" ? "8px 4px 8px 8px" : "4px 8px 8px 8px", padding: "10px 14px", maxWidth: "80%", fontSize: 13, color: "#e2e8f0", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                <div style={{ background: m.role === "user" ? "#1e1e1e" : "#111", border: `1px solid ${m.role === "user" ? "#333" : "#FACC1530"}`, borderRadius: m.role === "user" ? "8px 4px 8px 8px" : "4px 8px 8px 8px", padding: "10px 14px", maxWidth: "80%", fontSize: 13, color: "#e2e8f0", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
                   {m.text}
                 </div>
               </div>
             ))}
             {aiLoading && (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#2e1065", border: "1px solid #7c3aed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>AI</div>
-                <div style={{ background: "#0d1117", border: "1px solid #7c3aed44", borderRadius: "4px 8px 8px 8px", padding: "12px 16px" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#1a1500", border: "1px solid #FACC1566", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>AI</div>
+                <div style={{ background: "#111", border: "1px solid #FACC1530", borderRadius: "4px 8px 8px 8px", padding: "12px 16px" }}>
                   <div style={{ display: "flex", gap: 4 }}>
                     {[0, 1, 2].map((i) => (
-                      <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: "#a78bfa", animation: "pulse 1.2s ease-in-out infinite", animationDelay: `${i * 0.2}s` }} />
+                      <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: "#FACC15", animation: "pulse 1.2s ease-in-out infinite", animationDelay: `${i * 0.2}s` }} />
                     ))}
                   </div>
                 </div>
@@ -1407,7 +1454,7 @@ export default function PlanosTreino() {
             )}
           </div>
 
-          <div style={{ position: "sticky", bottom: 80, background: "#080c14", paddingBottom: 8, paddingTop: 4 }}>
+          <div style={{ position: "sticky", bottom: 80, background: "#0a0a0a", paddingBottom: 8, paddingTop: 4 }}>
             <div style={{ display: "flex", gap: 8 }}>
               <textarea
                 style={{ ...S.input, flex: 1, minHeight: 44, maxHeight: 120, resize: "none", padding: "12px 14px", lineHeight: 1.4 }}
@@ -1422,7 +1469,7 @@ export default function PlanosTreino() {
                   }
                 }}
               />
-              <button style={{ ...S.btn("#7c3aed"), padding: "12px 16px", flexShrink: 0, opacity: aiLoading ? 0.5 : 1 }} onClick={() => askAI()} disabled={aiLoading}>
+              <button style={{ ...S.btn("#FACC15"), color: "#000", padding: "12px 16px", flexShrink: 0, opacity: aiLoading ? 0.5 : 1 }} onClick={() => askAI()} disabled={aiLoading}>
                 Enviar
               </button>
             </div>
@@ -1548,7 +1595,7 @@ export default function PlanosTreino() {
             <span>{pl.nome}</span>
           </button>
         ))}
-        <button style={S.navBtn(tab === "coach", "#a78bfa")} onClick={() => setTab("coach")}>
+        <button style={S.navBtn(tab === "coach", "#FACC15")} onClick={() => setTab("coach")}>
           <span style={{ fontSize: 22 }}>AI</span>
           <span>COACH</span>
         </button>
