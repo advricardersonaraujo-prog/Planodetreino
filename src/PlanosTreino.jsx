@@ -780,98 +780,103 @@ export default function PlanosTreino() {
       minHeight: "100vh",
       background: "#080c14",
       color: "#e2e8f0",
-      fontFamily: "Arial, Helvetica, sans-serif",
-      paddingBottom: 270,
-      fontSize: 17,
+      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+      paddingBottom: 280,
+      fontSize: 16,
     },
     header: {
-      background: `linear-gradient(160deg, ${p.corBg} 0%, #0d1117 60%)`,
-      padding: "20px 16px 14px",
-      borderBottom: `1px solid ${p.corBorder}33`,
+      background: `linear-gradient(160deg, ${p.corBg} 0%, #0a0e1a 100%)`,
+      padding: "32px 24px 24px",
+      borderBottom: `1px solid ${p.corBorder}44`,
       transition: "background 0.4s",
     },
     pill: (cor) => ({
       display: "inline-block",
-      background: `${cor}22`,
+      background: `${cor}20`,
       color: cor,
-      border: `1px solid ${cor}44`,
-      borderRadius: 20,
-      padding: "5px 14px",
-      fontSize: 14,
-      letterSpacing: 2,
+      border: `1px solid ${cor}40`,
+      borderRadius: 24,
+      padding: "5px 16px",
+      fontSize: 12,
+      fontWeight: 600,
+      letterSpacing: 2.5,
       textTransform: "uppercase",
-      marginBottom: 6,
+      marginBottom: 10,
     }),
     card: {
-      background: "#0d1117",
+      background: "#111827",
       border: "1px solid #1e2938",
-      borderRadius: 8,
-      padding: 14,
-      marginBottom: 10,
+      borderRadius: 14,
+      padding: "20px 22px",
+      marginBottom: 14,
+      boxShadow: "0 2px 16px #00000050",
     },
     diaCard: (aberto) => ({
-      background: aberto ? `${p.corBg}88` : "#0d1117",
+      background: aberto ? `${p.corBg}99` : "#111827",
       border: `1px solid ${aberto ? p.corBorder : "#1e2938"}`,
-      borderRadius: 8,
-      marginBottom: 10,
+      borderRadius: 14,
+      marginBottom: 12,
       overflow: "hidden",
       transition: "all 0.3s",
+      boxShadow: aberto ? `0 6px 32px ${p.cor}18` : "0 2px 10px #00000040",
     }),
     diaHeader: {
-      padding: "16px 16px",
+      padding: "20px 22px",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       cursor: "pointer",
-      gap: 10,
+      gap: 12,
     },
     exRow: {
-      padding: "14px 16px 14px 12px",
-      borderTop: "1px solid #1e293822",
+      padding: "16px 22px 16px 18px",
+      borderTop: "1px solid #1e293840",
       display: "flex",
-      gap: 10,
+      gap: 14,
       alignItems: "flex-start",
     },
     badge: (cor) => ({
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      background: `${cor}22`,
+      background: `${cor}20`,
       color: cor,
-      border: `1px solid ${cor}44`,
-      borderRadius: 6,
-      padding: "4px 10px",
-      fontSize: 14,
-      fontWeight: 700,
+      border: `1px solid ${cor}40`,
+      borderRadius: 8,
+      padding: "5px 12px",
+      fontSize: 13,
+      fontWeight: 600,
       whiteSpace: "nowrap",
+      letterSpacing: 0.5,
     }),
     btn: (cor) => ({
       background: cor,
       color: "#fff",
       border: "none",
-      borderRadius: 8,
-      padding: "13px 18px",
+      borderRadius: 10,
+      padding: "14px 22px",
       fontWeight: 700,
       fontSize: 15,
-      letterSpacing: 1,
+      letterSpacing: 0.5,
       cursor: "pointer",
       fontFamily: "inherit",
+      boxShadow: `0 4px 18px ${cor}44`,
     }),
     btnGhost: {
       background: "none",
       color: "#64748b",
-      border: "1px solid #1e2938",
-      borderRadius: 6,
-      padding: "8px 12px",
-      fontSize: 14,
+      border: "1px solid #243044",
+      borderRadius: 8,
+      padding: "9px 14px",
+      fontSize: 13,
       cursor: "pointer",
       fontFamily: "inherit",
     },
     input: {
-      background: "#161b27",
-      border: "1px solid #2d3748",
-      borderRadius: 8,
-      padding: "12px 14px",
+      background: "#0d1117",
+      border: "1px solid #243044",
+      borderRadius: 10,
+      padding: "13px 16px",
       color: "#e2e8f0",
       fontSize: 16,
       width: "100%",
@@ -880,8 +885,9 @@ export default function PlanosTreino() {
       outline: "none",
     },
     label: {
-      fontSize: 13,
+      fontSize: 11,
       color: "#64748b",
+      fontWeight: 600,
       letterSpacing: 2,
       textTransform: "uppercase",
       marginBottom: 6,
@@ -889,17 +895,18 @@ export default function PlanosTreino() {
     },
     navBtn: (active, cor) => ({
       flex: 1,
-      padding: "12px 4px",
+      padding: "13px 4px",
       border: "none",
       background: "none",
       color: active ? cor : "#64748b",
-      fontSize: 12,
-      letterSpacing: 1,
+      fontSize: 11,
+      fontWeight: active ? 700 : 400,
+      letterSpacing: 0.5,
       cursor: "pointer",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
-      gap: 3,
+      gap: 4,
       borderTop: active ? `2px solid ${cor}` : "2px solid transparent",
       transition: "all 0.2s",
     }),
@@ -931,62 +938,70 @@ export default function PlanosTreino() {
 
   return (
     <div style={S.app}>
-      <style>{`* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #080c14; font-family: Arial, Helvetica, sans-serif; } button, input, textarea { font-family: Arial, Helvetica, sans-serif; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #080c14; } ::-webkit-scrollbar-thumb { background: #1e2938; border-radius: 4px; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
+      <style>{`* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #080c14; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button, input, textarea { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #0a0e1a; } ::-webkit-scrollbar-thumb { background: #243044; border-radius: 6px; } ::-webkit-scrollbar-thumb:hover { background: #2d3f5a; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
 
       <div style={S.header}>
         <span style={S.pill(p.cor)}>
           {p.icon} {p.nome}
         </span>
-        <h1 style={{ margin: 0, fontSize: 29, fontWeight: 700, color: "#f8fafc" }}>Planos de Treino</h1>
-        <p style={{ margin: "4px 0 0", fontSize: 15, color: "#94a3b8" }}>{p.subtitulo}</p>
+        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, color: "#f8fafc", letterSpacing: -0.5 }}>Planos de Treino</h1>
+        <p style={{ margin: "6px 0 0", fontSize: 15, color: "#94a3b8", fontWeight: 400 }}>{p.subtitulo}</p>
       </div>
 
-      <div style={{ padding: "12px 16px 0", display: "flex", gap: 8 }}>
+      <div style={{ maxWidth: 820, margin: "0 auto" }}>
+
+      <div style={{ padding: "20px 20px 0", display: "flex", gap: 10 }}>
         {Object.values(planos).map((pl) => (
           <button
             key={pl.id}
             style={{
               flex: 1,
-              padding: "12px 4px",
-              background: planoAtivo === pl.id ? `${pl.cor}22` : "#0d1117",
+              padding: "14px 8px",
+              background: planoAtivo === pl.id ? `${pl.cor}18` : "#111827",
               border: `1px solid ${planoAtivo === pl.id ? pl.cor : "#1e2938"}`,
-              borderRadius: 8,
+              borderRadius: 12,
               color: planoAtivo === pl.id ? pl.cor : "#64748b",
-              fontSize: 12,
-              letterSpacing: 1,
+              fontSize: 11,
+              fontWeight: planoAtivo === pl.id ? 700 : 400,
+              letterSpacing: 1.5,
               cursor: "pointer",
               fontFamily: "inherit",
               transition: "all 0.2s",
+              boxShadow: planoAtivo === pl.id ? `0 4px 20px ${pl.cor}28` : "none",
             }}
             onClick={() => {
               setPlanoAtivo(pl.id);
               setDiaAberto(null);
             }}
           >
-            <div style={{ fontSize: 22, marginBottom: 4 }}>{pl.icon}</div>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>{pl.icon}</div>
             {pl.nome}
           </button>
         ))}
       </div>
 
-      <div style={{ padding: "12px 16px 0", display: "flex", gap: 6 }}>
+      <div style={{ padding: "16px 20px 0", display: "flex", gap: 6, borderBottom: "1px solid #1e2938", marginBottom: 0 }}>
         {[
-          ["planos", "Exercicios"],
+          ["planos", "Exercícios"],
           ["cronograma", "Cronograma"],
-          ["historico", "Historico"],
+          ["historico", "Histórico"],
         ].map(([id, label]) => (
           <button
             key={id}
             style={{
-              padding: "9px 16px",
-              borderRadius: 20,
-              background: tab === id ? `${p.cor}22` : "none",
-              border: `1px solid ${tab === id ? p.cor : "#1e2938"}`,
+              padding: "10px 18px",
+              borderRadius: 0,
+              background: "none",
+              border: "none",
+              borderBottom: tab === id ? `2px solid ${p.cor}` : "2px solid transparent",
               color: tab === id ? p.cor : "#64748b",
-              fontSize: 13,
+              fontSize: 14,
+              fontWeight: tab === id ? 600 : 400,
               cursor: "pointer",
               fontFamily: "inherit",
-              letterSpacing: 1,
+              letterSpacing: 0.3,
+              marginBottom: -1,
+              transition: "all 0.2s",
             }}
             onClick={() => setTab(id)}
           >
@@ -1004,7 +1019,7 @@ export default function PlanosTreino() {
       </div>
 
       {tab === "planos" && (
-        <div style={{ padding: "12px 16px 0" }}>
+        <div style={{ padding: "16px 20px 0" }}>
           <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
             <p style={{ margin: "0 0 10px", fontSize: 14, color: "#94a3b8", lineHeight: 1.6 }}>{p.descricao}</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1516,7 +1531,9 @@ export default function PlanosTreino() {
         </section>
       )}
 
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#080c14", borderTop: "1px solid #1e2938", display: "flex", zIndex: 100 }}>
+      </div>{/* fim max-width wrapper */}
+
+      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0a0e1aee", borderTop: "1px solid #1e2938", display: "flex", zIndex: 100, backdropFilter: "blur(12px)" }}>
         {Object.values(planos).map((pl) => (
           <button
             key={pl.id}
