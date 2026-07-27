@@ -6,9 +6,9 @@ const PLANOS_BASE = {
     id: "adaptacao",
     nome: "ADAPTACAO",
     subtitulo: "Semanas 1-4 - Retorno progressivo",
-    cor: "#22d3ee",
-    corBg: "#083344",
-    corBorder: "#0e7490",
+    cor: "#FACC15",
+    corBg: "#1a1500",
+    corBorder: "#3d3000",
     icon: "↻",
     descricao:
       "Reativacao neuromuscular apos pausa. Cargas moderadas (60-70% 1RM), foco em tecnica, amplitude total e reconexao mente-musculo. Volumes baixos para evitar overreaching.",
@@ -69,9 +69,9 @@ const PLANOS_BASE = {
     id: "manutencao",
     nome: "MANUTENCAO",
     subtitulo: "Semanas 5-10 - Hipertrofia controlada",
-    cor: "#a78bfa",
-    corBg: "#2e1065",
-    corBorder: "#7c3aed",
+    cor: "#EAB308",
+    corBg: "#1a1200",
+    corBorder: "#3a2800",
     icon: "◆",
     descricao:
       "Estimulo moderado-alto para manter e reconstruir massa magra. Progressao de carga semanal, tecnicas como drop-set introduzidas gradualmente. Deficit calorico leve permitido.",
@@ -133,9 +133,9 @@ const PLANOS_BASE = {
     id: "queima",
     nome: "QUEIMA",
     subtitulo: "Semanas 11-16 - Definicao + Lipolise",
-    cor: "#f97316",
-    corBg: "#431407",
-    corBorder: "#c2410c",
+    cor: "#F59E0B",
+    corBg: "#1a1000",
+    corBorder: "#3d2600",
     icon: "▲",
     descricao:
       "Alto volume, menor descanso, cardio HIIT integrado. Manter carga para preservar massa. Supersets e trisets para elevar EPOC. Deficit calorico moderado (300-500 kcal).",
@@ -778,7 +778,7 @@ export default function PlanosTreino() {
   const S = {
     app: {
       minHeight: "100vh",
-      background: "#080c14",
+      background: "#0a0a0a",
       color: "#e2e8f0",
       fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
       paddingBottom: 280,
@@ -938,7 +938,7 @@ export default function PlanosTreino() {
 
   return (
     <div style={S.app}>
-      <style>{`* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #080c14; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button, input, textarea { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #0a0e1a; } ::-webkit-scrollbar-thumb { background: #243044; border-radius: 6px; } ::-webkit-scrollbar-thumb:hover { background: #2d3f5a; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
+      <style>{`* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #0a0a0a; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button, input, textarea { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #0a0e1a; } ::-webkit-scrollbar-thumb { background: #243044; border-radius: 6px; } ::-webkit-scrollbar-thumb:hover { background: #2d3f5a; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
 
       <div style={S.header}>
         <span style={S.pill(p.cor)}>
@@ -1203,9 +1203,9 @@ export default function PlanosTreino() {
           <div style={S.card}>
             <p style={{ ...S.label, marginBottom: 12 }}>Progressao sugerida - 16 semanas</p>
             {[
-              { semanas: "1-4", plano: "ADAPTACAO", cor: "#22d3ee", icon: "↻", desc: "Reativacao, tecnica, volume baixo. Cargas 60-70%." },
-              { semanas: "5-10", plano: "MANUTENCAO", cor: "#a78bfa", icon: "◆", desc: "Hipertrofia controlada, progressao linear. 70-80%." },
-              { semanas: "11-16", plano: "QUEIMA", cor: "#f97316", icon: "▲", desc: "Alto volume, supersets, HIIT integrado. Deficit leve." },
+              { semanas: "1-4", plano: "ADAPTACAO", cor: "#FACC15", icon: "↻", desc: "Reativacao, tecnica, volume baixo. Cargas 60-70%." },
+              { semanas: "5-10", plano: "MANUTENCAO", cor: "#EAB308", icon: "◆", desc: "Hipertrofia controlada, progressao linear. 70-80%." },
+              { semanas: "11-16", plano: "QUEIMA", cor: "#F59E0B", icon: "▲", desc: "Alto volume, supersets, HIIT integrado. Deficit leve." },
             ].map((item, i) => (
               <div key={item.plano} style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "flex-start" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -1226,13 +1226,13 @@ export default function PlanosTreino() {
           <div style={S.card}>
             <p style={{ ...S.label, marginBottom: 12 }}>Semana-tipo - 5 dias</p>
             {[
-              { dia: "DOM", label: "Treino A", sub: "Peito + Triceps", cor: "#f97316" },
-              { dia: "SEG", label: "Treino B", sub: "Costas + Biceps", cor: "#a78bfa" },
-              { dia: "TER", label: "Treino C", sub: "Pernas + Gluteos", cor: "#22d3ee" },
-              { dia: "QUA", label: "Treino D", sub: "Ombros + Core", cor: "#34d399" },
-              { dia: "QUI", label: "Descanso Ativo", sub: "Caminhada 30min ou mobilidade", cor: "#64748b" },
-              { dia: "SEX", label: "Treino E", sub: "Full body + cardio", cor: "#f97316" },
-              { dia: "SAB", label: "Descanso", sub: "Recuperacao total", cor: "#64748b" },
+              { dia: "DOM", label: "Treino A", sub: "Peito + Triceps", cor: "#FACC15" },
+              { dia: "SEG", label: "Treino B", sub: "Costas + Biceps", cor: "#EAB308" },
+              { dia: "TER", label: "Treino C", sub: "Pernas + Gluteos", cor: "#F59E0B" },
+              { dia: "QUA", label: "Treino D", sub: "Ombros + Core", cor: "#FACC15" },
+              { dia: "QUI", label: "Descanso Ativo", sub: "Caminhada 30min ou mobilidade", cor: "#475569" },
+              { dia: "SEX", label: "Treino E", sub: "Full body + cardio", cor: "#EAB308" },
+              { dia: "SAB", label: "Descanso", sub: "Recuperacao total", cor: "#475569" },
             ].map((item) => (
               <div key={item.dia} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <span style={{ ...S.badge(item.cor), width: 48, justifyContent: "center" }}>{item.dia}</span>
@@ -1533,7 +1533,7 @@ export default function PlanosTreino() {
 
       </div>{/* fim max-width wrapper */}
 
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0a0e1aee", borderTop: "1px solid #1e2938", display: "flex", zIndex: 100, backdropFilter: "blur(12px)" }}>
+      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0a0a0aee", borderTop: "1px solid #1e1e1e", display: "flex", zIndex: 100, backdropFilter: "blur(12px)" }}>
         {Object.values(planos).map((pl) => (
           <button
             key={pl.id}
