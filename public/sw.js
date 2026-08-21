@@ -1,4 +1,4 @@
-const CACHE_NAME = "planos-treino-v13";
+const CACHE_NAME = "planos-treino-v14";
 const APP_SHELL = ["/manifest.webmanifest", "/app-icon.svg"];
 
 self.addEventListener("install", (event) => {

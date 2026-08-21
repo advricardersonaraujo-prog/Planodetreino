@@ -508,6 +508,25 @@ function getPresenceThermometer(count) {
   return phrases[Math.max(0, Math.min(phrases.length - 1, count))];
 }
 
+function getWeekReference(offset, reference = new Date()) {
+  const date = new Date(reference);
+  date.setDate(date.getDate() + offset * 7);
+  return date;
+}
+
+function formatWeekRange(reference = new Date()) {
+  const start = getWeekStartMonday(reference);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  try {
+    const formatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" });
+    return `${formatter.format(start)} - ${formatter.format(end)}`;
+  } catch {
+    return `${getDateKey(start)} - ${getDateKey(end)}`;
+  }
+}
+
 function getAiConversationTitle(messages) {
   const firstUserMessage = messages.find((message) => message.role === "user")?.text || "Nova conversa";
   return firstUserMessage.length > 54 ? `${firstUserMessage.slice(0, 54)}...` : firstUserMessage;
@@ -578,6 +597,7 @@ export default function PlanosTreino() {
   const [timerY, setTimerY] = useState(null);
   const [timerDrag, setTimerDrag] = useState(null);
   const [timerMinimizado, setTimerMinimizado] = useState(true);
+  const [presenceWeekOffset, setPresenceWeekOffset] = useState(0);
   const [sessionNow, setSessionNow] = useState(Date.now());
   const [timer, setTimer] = useState({
     duration: DEFAULT_REST_SECONDS,
@@ -1108,9 +1128,11 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
 
   const p = plano;
   const visibleAiHistory = showAllAiHistory ? aiHistory : aiHistory.slice(0, 5);
-  const weeklyPresence = getWeeklyPresence(historico, new Date(sessionNow));
+  const weeklyReference = getWeekReference(presenceWeekOffset, new Date(sessionNow));
+  const weeklyPresence = getWeeklyPresence(historico, weeklyReference);
   const weeklyPresenceCount = weeklyPresence.filter((day) => day.completed).length;
   const weeklyPresencePhrase = getPresenceThermometer(weeklyPresenceCount);
+  const weeklyPresenceRange = formatWeekRange(weeklyReference);
 
   const S = {
     app: {
@@ -1319,9 +1341,36 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
 
       <div style={{ padding: "18px 20px 0" }}>
         <div style={{ ...S.card, padding: "14px 16px", marginBottom: 0, background: "#0d1117", borderColor: "#243044" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <p style={{ ...S.label, margin: 0, color: "#94a3b8" }}>Presenca semanal</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ ...S.label, margin: 0, color: "#94a3b8" }}>Presenca semanal</p>
+              <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12, fontWeight: 700 }}>
+                {presenceWeekOffset === 0 ? "Semana atual" : `${Math.abs(presenceWeekOffset)} sem. atras`} · {weeklyPresenceRange}
+              </p>
+            </div>
             <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{weeklyPresenceCount}/7</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <button
+              style={{ ...S.btnGhost, padding: "8px 10px", fontSize: 12, color: "#94a3b8" }}
+              onClick={() => setPresenceWeekOffset((current) => current - 1)}
+            >
+              ← Semana
+            </button>
+            <button
+              style={{ ...S.btnGhost, padding: "8px 10px", fontSize: 12, color: presenceWeekOffset === 0 ? "#475569" : "#FACC15", opacity: presenceWeekOffset === 0 ? 0.55 : 1 }}
+              onClick={() => setPresenceWeekOffset(0)}
+              disabled={presenceWeekOffset === 0}
+            >
+              Hoje
+            </button>
+            <button
+              style={{ ...S.btnGhost, padding: "8px 10px", fontSize: 12, color: presenceWeekOffset < 0 ? "#94a3b8" : "#475569", opacity: presenceWeekOffset < 0 ? 1 : 0.55 }}
+              onClick={() => setPresenceWeekOffset((current) => Math.min(0, current + 1))}
+              disabled={presenceWeekOffset === 0}
+            >
+              Semana →
+            </button>
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
             {weeklyPresence.map((day) => (
