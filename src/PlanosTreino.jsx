@@ -495,14 +495,14 @@ function getWeeklyPresence(history, reference = new Date()) {
 
 function getPresenceThermometer(count) {
   const phrases = [
-    "Zero presencas. A academia ja abriu boletim de desaparecimento.",
-    "Primeira marcacao. O motor tossiu, mas pegou.",
-    "Duas presencas. Ja da para chamar de rotina sem rir muito.",
-    "Tres treinos. A semana comecou a respeitar voce.",
-    "Quatro treinos. Agora sim, o sofa esta perdendo a discussao.",
-    "Cinco treinos. Modo serio ativado, com leve cheiro de superacao.",
-    "Seis presencas. A planilha esta quase pedindo descanso.",
-    "Sete de sete. Calma, atleta, deixa um pouco de gloria para os mortais.",
+    "😴 Zero presenças. A academia já abriu boletim de desaparecimento.",
+    "😅 Primeira marcação. O motor tossiu, mas pegou.",
+    "🙂 Duas presenças. Já dá para chamar de rotina sem rir muito.",
+    "😎 Três treinos. A semana começou a respeitar você.",
+    "🔥 Quatro treinos. Agora sim, o sofá está perdendo a discussão.",
+    "💪 Cinco treinos. Modo sério ativado, com leve cheiro de superação.",
+    "⚡ Seis presenças. A planilha já está quase pedindo descanso.",
+    "🏆 Sete de sete. Calma, atleta, deixe um pouco de glória para os mortais.",
   ];
 
   return phrases[Math.max(0, Math.min(phrases.length - 1, count))];
