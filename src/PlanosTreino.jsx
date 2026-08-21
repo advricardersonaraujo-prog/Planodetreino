@@ -195,6 +195,7 @@ const PLANOS_BASE = {
 
 const STORAGE_KEY = "planos_treino_v2";
 const HISTORY_KEY = "planos_treino_historico_v1";
+const AI_HISTORY_KEY = "planos_treino_ai_conversas_v1";
 const DEFAULT_REST_SECONDS = 50;
 const CARDIO_OPTIONS = [
   "Esteira - caminhada inclinada",
@@ -322,6 +323,24 @@ function saveHistory(history) {
   }
 }
 
+function loadAiHistory() {
+  try {
+    const raw = localStorage.getItem(AI_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAiHistory(history) {
+  try {
+    localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
 function secondsFromRest(rest) {
   const values = String(rest).match(/\d+/g)?.map(Number) || [];
   return values.length ? Math.max(...values) : DEFAULT_REST_SECONDS;
@@ -339,6 +358,24 @@ function formatDateTime(value) {
   } catch {
     return value;
   }
+}
+
+function formatAiHistoryDate(value) {
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
+
+function getAiConversationTitle(messages) {
+  const firstUserMessage = messages.find((message) => message.role === "user")?.text || "Nova conversa";
+  return firstUserMessage.length > 54 ? `${firstUserMessage.slice(0, 54)}...` : firstUserMessage;
 }
 
 function mergeHistory(localHistory, remoteHistory) {
@@ -361,6 +398,9 @@ export default function PlanosTreino() {
   const [tab, setTab] = useState("planos");
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState([]);
+  const [aiHistory, setAiHistory] = useState(loadAiHistory);
+  const [aiConversationId, setAiConversationId] = useState(null);
+  const [showAllAiHistory, setShowAllAiHistory] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [treinoSessao, setTreinoSessao] = useState(null);
   const [historico, setHistorico] = useState(loadHistory);
@@ -406,6 +446,51 @@ export default function PlanosTreino() {
     const merged = mergeHistory(updated, []);
     setHistorico(merged);
     saveHistory(merged);
+  };
+
+  const persistAiHistory = (updated) => {
+    const clean = updated
+      .filter((conversation) => conversation?.id && Array.isArray(conversation.messages) && conversation.messages.length > 0)
+      .slice(0, 80);
+    setAiHistory(clean);
+    saveAiHistory(clean);
+  };
+
+  const saveCurrentAiConversation = (messages, conversationId = aiConversationId, baseHistory = aiHistory) => {
+    if (!Array.isArray(messages) || messages.length === 0) return conversationId;
+
+    const now = new Date().toISOString();
+    const nextId = conversationId || `ai_${Date.now()}`;
+    const existing = baseHistory.find((conversation) => conversation.id === nextId);
+    const record = {
+      id: nextId,
+      title: getAiConversationTitle(messages),
+      messages,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    };
+    const updated = [record, ...baseHistory.filter((conversation) => conversation.id !== nextId)];
+
+    persistAiHistory(updated);
+    if (!conversationId) setAiConversationId(nextId);
+    return nextId;
+  };
+
+  const startNewAiConversation = () => {
+    if (aiMessages.length > 0) {
+      saveCurrentAiConversation(aiMessages);
+    }
+    setAiMessages([]);
+    setAiConversationId(null);
+    setShowAllAiHistory(false);
+  };
+
+  const openAiConversation = (conversation) => {
+    if (aiMessages.length > 0 && aiConversationId !== conversation.id) {
+      saveCurrentAiConversation(aiMessages);
+    }
+    setAiMessages(conversation.messages || []);
+    setAiConversationId(conversation.id);
   };
 
   const completeSeries = (key, maxSeries = 99) => {
@@ -759,10 +844,12 @@ export default function PlanosTreino() {
 
     const apiKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!apiKey) {
-      setAiMessages((prev) => [...prev, {
+      const finalMessages = [...newMessages, {
         role: "assistant",
         text: "Chave da API Groq nao configurada.\n\nAdicione VITE_GROQ_API_KEY no arquivo .env ou nas variaveis de ambiente do Vercel/Netlify.\n\nObtenha sua chave em: console.groq.com/keys",
-      }]);
+      }];
+      setAiMessages(finalMessages);
+      saveCurrentAiConversation(finalMessages);
       setAiLoading(false);
       return;
     }
@@ -813,18 +900,23 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content
         || "Não consegui gerar uma resposta. Tente novamente.";
-      setAiMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+      const finalMessages = [...newMessages, { role: "assistant", text: reply }];
+      setAiMessages(finalMessages);
+      saveCurrentAiConversation(finalMessages);
     } catch (err) {
-      setAiMessages((prev) => [...prev, {
+      const finalMessages = [...newMessages, {
         role: "assistant",
         text: `Erro ao conectar com Groq: ${err.message}`,
-      }]);
+      }];
+      setAiMessages(finalMessages);
+      saveCurrentAiConversation(finalMessages);
     } finally {
       setAiLoading(false);
     }
   };
 
   const p = plano;
+  const visibleAiHistory = showAllAiHistory ? aiHistory : aiHistory.slice(0, 5);
 
   const S = {
     app: {
@@ -1414,6 +1506,52 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
 
       {tab === "coach" && (
         <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column" }}>
+          {aiHistory.length > 0 && (
+            <div style={{ ...S.card, padding: 10, background: "#0b0b0b", borderColor: "#222", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                <p style={{ ...S.label, margin: 0, color: "#64748b" }}>Conversas recentes</p>
+                {aiMessages.length > 0 && (
+                  <button style={{ ...S.btnGhost, padding: "6px 10px", fontSize: 11 }} onClick={startNewAiConversation}>
+                    Nova conversa
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {visibleAiHistory.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    style={{
+                      ...S.btnGhost,
+                      width: "100%",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      textAlign: "left",
+                      padding: "8px 10px",
+                      fontSize: 12,
+                      color: aiConversationId === conversation.id ? "#FACC15" : "#94a3b8",
+                      borderColor: aiConversationId === conversation.id ? "#FACC1544" : "#1e2938",
+                      background: aiConversationId === conversation.id ? "#1a150055" : "none",
+                    }}
+                    onClick={() => openAiConversation(conversation)}
+                  >
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{conversation.title}</span>
+                    <span style={{ flexShrink: 0, color: "#475569", fontSize: 11 }}>{formatAiHistoryDate(conversation.updatedAt)}</span>
+                  </button>
+                ))}
+              </div>
+              {aiHistory.length > 5 && (
+                <button
+                  style={{ ...S.btnGhost, width: "100%", marginTop: 8, padding: "7px 10px", fontSize: 11, color: "#64748b" }}
+                  onClick={() => setShowAllAiHistory((current) => !current)}
+                >
+                  {showAllAiHistory ? "Ver menos" : `Ver mais (${aiHistory.length - 5})`}
+                </button>
+              )}
+            </div>
+          )}
+
           {aiMessages.length === 0 && (
             <div style={{ marginBottom: 12 }}>
               <p style={{ ...S.label, color: "#FACC15", marginBottom: 10 }}>Coach IA - Groq</p>
@@ -1478,8 +1616,8 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
               </button>
             </div>
             {aiMessages.length > 0 && (
-              <button style={{ ...S.btnGhost, marginTop: 6, fontSize: 11, width: "100%" }} onClick={() => setAiMessages([])}>
-                Limpar conversa
+              <button style={{ ...S.btnGhost, marginTop: 6, fontSize: 11, width: "100%" }} onClick={startNewAiConversation}>
+                Nova conversa
               </button>
             )}
           </div>
