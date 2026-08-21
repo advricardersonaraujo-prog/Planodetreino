@@ -1110,6 +1110,10 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
       padding: "32px 24px 24px",
       borderBottom: `1px solid ${p.corBorder}44`,
       transition: "background 0.4s",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 16,
     },
     pill: (cor) => ({
       display: "inline-block",
@@ -1262,11 +1266,37 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
       <style>{`* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } body { margin: 0; background: #0a0a0a; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button, input, textarea { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; } button:disabled { cursor: wait; } ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #0a0e1a; } ::-webkit-scrollbar-thumb { background: #243044; border-radius: 6px; } ::-webkit-scrollbar-thumb:hover { background: #2d3f5a; } @keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }`}</style>
 
       <div style={S.header}>
-        <span style={S.pill(p.cor)}>
-          {p.icon} {p.nome}
-        </span>
-        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, color: "#f8fafc", letterSpacing: -0.5 }}>Planos de Treino</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 15, color: "#94a3b8", fontWeight: 400 }}>{p.subtitulo}</p>
+        <div style={{ minWidth: 0 }}>
+          <span style={S.pill(p.cor)}>
+            {p.icon} {p.nome}
+          </span>
+          <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, color: "#f8fafc", letterSpacing: -0.5 }}>Planos de Treino</h1>
+          <p style={{ margin: "6px 0 0", fontSize: 15, color: "#94a3b8", fontWeight: 400 }}>{p.subtitulo}</p>
+        </div>
+        <button
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 10,
+            border: `1px solid ${p.cor}55`,
+            background: "#0d1117cc",
+            color: p.cor,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 5,
+            cursor: "pointer",
+            flexShrink: 0,
+            boxShadow: `0 6px 20px ${p.cor}18`,
+          }}
+          aria-label="Abrir menu"
+          title="Menu"
+        >
+          {[0, 1, 2].map((line) => (
+            <span key={line} style={{ width: 22, height: 2, borderRadius: 99, background: "currentColor", display: "block" }} />
+          ))}
+        </button>
       </div>
 
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
