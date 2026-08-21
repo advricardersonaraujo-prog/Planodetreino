@@ -198,8 +198,20 @@ const HISTORY_KEY = "planos_treino_historico_v1";
 const AI_HISTORY_KEY = "planos_treino_ai_conversas_v1";
 const MEASURES_KEY = "planos_treino_medidas_v1";
 const SETTINGS_KEY = "planos_treino_config_v1";
+const CALORIE_HISTORY_KEY = "planos_treino_calorias_v1";
 const DEFAULT_REST_SECONDS = 50;
 const DEFAULT_SETTINGS = { restSeconds: DEFAULT_REST_SECONDS, theme: "gold", compactMode: true };
+const CALORIE_ACTIVITIES = [
+  { id: "musculacao_moderada", nome: "Musculação moderada", met: 5.0 },
+  { id: "musculacao_intensa", nome: "Musculação intensa", met: 6.0 },
+  { id: "caminhada", nome: "Caminhada rápida", met: 4.3 },
+  { id: "esteira_inclinada", nome: "Esteira inclinada", met: 6.5 },
+  { id: "corrida_leve", nome: "Corrida leve", met: 8.3 },
+  { id: "bike_moderada", nome: "Bike moderada", met: 6.8 },
+  { id: "eliptico", nome: "Elíptico", met: 5.0 },
+  { id: "hiit", nome: "HIIT / circuito", met: 8.0 },
+];
+const CALORIE_EMPTY = { peso: "", minutos: "", atividadeId: CALORIE_ACTIVITIES[0].id, intensidade: "padrao" };
 const CARDIO_OPTIONS = [
   "Esteira - caminhada inclinada",
   "Esteira - corrida",
@@ -458,6 +470,24 @@ function saveSettings(settings) {
   }
 }
 
+function loadCalorieHistory() {
+  try {
+    const raw = localStorage.getItem(CALORIE_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCalorieHistory(history) {
+  try {
+    localStorage.setItem(CALORIE_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
 function secondsFromRest(rest) {
   const values = String(rest).match(/\d+/g)?.map(Number) || [];
   return values.length ? Math.max(...values) : DEFAULT_REST_SECONDS;
@@ -533,6 +563,27 @@ function measureDelta(current, previous, field) {
   const previousValue = Number(previous?.[field]);
   if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) return null;
   return currentValue - previousValue;
+}
+
+function getCalorieActivity(activityId) {
+  return CALORIE_ACTIVITIES.find((activity) => activity.id === activityId) || CALORIE_ACTIVITIES[0];
+}
+
+function getAdjustedMet(activity, intensity) {
+  const factors = { leve: 0.85, padrao: 1, intensa: 1.18 };
+  return activity.met * (factors[intensity] || 1);
+}
+
+function calculateCalories({ peso, minutos, atividadeId, intensidade }) {
+  const weight = Number(peso);
+  const duration = Number(minutos);
+  if (!weight || !duration || weight <= 0 || duration <= 0) return null;
+
+  const activity = getCalorieActivity(atividadeId);
+  const met = getAdjustedMet(activity, intensidade);
+  const calories = Math.round((met * 3.5 * weight * duration) / 200);
+
+  return { activity, met, calories, weight, duration };
 }
 
 function getWeekStartMonday(reference = new Date()) {
@@ -663,6 +714,8 @@ export default function PlanosTreino() {
   const [historico, setHistorico] = useState(loadHistory);
   const [medidas, setMedidas] = useState(loadMeasures);
   const [medidaForm, setMedidaForm] = useState(emptyMeasureForm);
+  const [calorieForm, setCalorieForm] = useState(CALORIE_EMPTY);
+  const [calorieHistory, setCalorieHistory] = useState(loadCalorieHistory);
   const [settings, setSettings] = useState(loadSettings);
   const [cardioForm, setCardioForm] = useState(CARDIO_EMPTY);
   const [authEmail, setAuthEmail] = useState("");
@@ -724,6 +777,15 @@ export default function PlanosTreino() {
     saveSettings(clean);
   };
 
+  const persistCalorieHistory = (updated) => {
+    const clean = updated
+      .filter((item) => item?.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 60);
+    setCalorieHistory(clean);
+    saveCalorieHistory(clean);
+  };
+
   const openMenuModule = (nextTab) => {
     setTab(nextTab);
     setMenuAberto(false);
@@ -762,6 +824,26 @@ export default function PlanosTreino() {
         ? current
         : { ...current, duration: seconds, remaining: seconds, label: "Descanso" }
     ));
+  };
+
+  const saveCalorieEstimate = () => {
+    if (!calorieResult) {
+      window.alert("Informe peso e tempo válidos para calcular.");
+      return;
+    }
+
+    const record = {
+      id: `caloria_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      peso: calorieResult.weight,
+      minutos: calorieResult.duration,
+      atividade: calorieResult.activity.nome,
+      intensidade: calorieForm.intensidade,
+      met: Number(calorieResult.met.toFixed(1)),
+      calorias: calorieResult.calories,
+    };
+
+    persistCalorieHistory([record, ...calorieHistory]);
   };
 
   const persistAiHistory = (updated) => {
@@ -1268,6 +1350,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
   const sortedMedidas = [...medidas].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const ultimaMedida = sortedMedidas[0];
   const medidaAnterior = sortedMedidas[1];
+  const calorieResult = calculateCalories(calorieForm);
   const renderMeasureDelta = (field, unit = "") => {
     const delta = measureDelta(ultimaMedida, medidaAnterior, field);
     if (delta === null || delta === 0) return null;
@@ -1499,6 +1582,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
 
             {[
               { id: "medidas", label: "Medidas Corporais", desc: "Peso, cintura, braço, peito, check-ins e evolução.", icon: "📏" },
+              { id: "calorias", label: "Gasto Calórico", desc: "Calcule gasto estimado por atividade, tempo e peso.", icon: "🔥" },
               { id: "configuracoes", label: "Configurações", desc: "Timer, tema, sincronização e login/Supabase.", icon: "⚙️" },
             ].map((item) => (
               <button
@@ -2124,6 +2208,124 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {tab === "calorias" && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
+            <p style={{ ...S.label, color: p.cor }}>Calculadora de gasto calórico</p>
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+              Estimativa padrão por MET. Preencha peso, atividade e tempo para calcular o gasto aproximado do treino.
+            </p>
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Dados do treino</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <label style={S.label}>Peso (kg)</label>
+                <input
+                  style={S.input}
+                  type="number"
+                  step="0.1"
+                  placeholder="Ex: 82.5"
+                  value={calorieForm.peso}
+                  onChange={(event) => setCalorieForm((current) => ({ ...current, peso: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={S.label}>Tempo (min)</label>
+                <input
+                  style={S.input}
+                  type="number"
+                  min="1"
+                  placeholder="Ex: 60"
+                  value={calorieForm.minutos}
+                  onChange={(event) => setCalorieForm((current) => ({ ...current, minutos: event.target.value }))}
+                />
+              </div>
+            </div>
+
+            <label style={S.label}>Atividade</label>
+            <select
+              style={{ ...S.input, marginBottom: 8 }}
+              value={calorieForm.atividadeId}
+              onChange={(event) => setCalorieForm((current) => ({ ...current, atividadeId: event.target.value }))}
+            >
+              {CALORIE_ACTIVITIES.map((activity) => (
+                <option key={activity.id} value={activity.id}>
+                  {activity.nome} · MET {activity.met}
+                </option>
+              ))}
+            </select>
+
+            <label style={S.label}>Intensidade percebida</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              {[
+                ["leve", "Leve"],
+                ["padrao", "Padrão"],
+                ["intensa", "Intensa"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  style={{
+                    ...S.btnGhost,
+                    color: calorieForm.intensidade === id ? "#0a0a0a" : "#e2e8f0",
+                    background: calorieForm.intensidade === id ? "#FACC15" : "#111827",
+                    borderColor: calorieForm.intensidade === id ? "#FACC15" : "#243044",
+                    fontWeight: 800,
+                  }}
+                  onClick={() => setCalorieForm((current) => ({ ...current, intensidade: id }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...S.card, borderColor: calorieResult ? "#FACC1555" : "#243044" }}>
+            <p style={{ ...S.label, color: calorieResult ? p.cor : "#64748b" }}>Resultado</p>
+            {calorieResult ? (
+              <div>
+                <strong style={{ display: "block", color: p.cor, fontSize: 42, lineHeight: 1, marginBottom: 8 }}>
+                  {calorieResult.calories} kcal
+                </strong>
+                <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 14, lineHeight: 1.5 }}>
+                  {calorieResult.activity.nome}, {calorieResult.duration} min, {calorieResult.weight} kg, MET ajustado {calorieResult.met.toFixed(1)}.
+                </p>
+                <button style={{ ...S.btn(p.cor), width: "100%", color: "#0a0a0a" }} onClick={saveCalorieEstimate}>
+                  Salvar estimativa
+                </button>
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15 }}>Preencha peso e tempo para ver o gasto estimado.</p>
+            )}
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Estimativas recentes</p>
+            {calorieHistory.length === 0 ? (
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15 }}>Nenhuma estimativa salva ainda.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {calorieHistory.map((item) => (
+                  <div key={item.id} style={{ border: "1px solid #243044", borderRadius: 10, padding: 12, background: "#0d1117" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                      <div>
+                        <strong style={{ color: "#f8fafc", fontSize: 16 }}>{item.calorias} kcal</strong>
+                        <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 13 }}>{item.atividade} · {item.minutos} min · {item.peso} kg</p>
+                      </div>
+                      <span style={S.badge("#FACC15")}>{formatDateTime(item.createdAt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p style={{ margin: "12px 0 0", color: "#64748b", fontSize: 12, lineHeight: 1.5 }}>
+              Estimativa aproximada. Relógios, esteiras e fórmulas por MET podem variar conforme condicionamento, técnica e intensidade real.
+            </p>
           </div>
         </div>
       )}
