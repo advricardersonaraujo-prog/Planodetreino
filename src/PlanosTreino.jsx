@@ -360,6 +360,18 @@ function normalizePlanos(data) {
   const planos = JSON.parse(JSON.stringify(data || PLANOS_BASE));
 
   Object.values(planos).forEach((plano) => {
+    const base = PLANOS_BASE[plano.id];
+    if (base) {
+      plano.nome = base.nome;
+      plano.subtitulo = base.subtitulo;
+      plano.cor = base.cor;
+      plano.corBg = base.corBg;
+      plano.corBorder = base.corBorder;
+      plano.icon = base.icon;
+      plano.descricao = base.descricao;
+      plano.parametros = { ...base.parametros, ...plano.parametros };
+    }
+
     plano.parametros = { ...plano.parametros, descanso: "50s" };
     plano.dias = Array.isArray(plano.dias) ? plano.dias : [];
 
