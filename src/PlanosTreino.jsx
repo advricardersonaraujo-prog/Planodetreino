@@ -463,7 +463,7 @@ export default function PlanosTreino() {
   const [timerX, setTimerX] = useState(12);
   const [timerY, setTimerY] = useState(null);
   const [timerDrag, setTimerDrag] = useState(null);
-  const [timerMinimizado, setTimerMinimizado] = useState(false);
+  const [timerMinimizado, setTimerMinimizado] = useState(true);
   const [sessionNow, setSessionNow] = useState(Date.now());
   const [timer, setTimer] = useState({
     duration: DEFAULT_REST_SECONDS,
@@ -636,7 +636,7 @@ export default function PlanosTreino() {
   }, [timerDrag]);
 
   const startTimer = (seconds = descansoPadrao, label = "Descanso", targetKey = null) => {
-    setTimerMinimizado(false);
+    setTimerMinimizado(true);
     setTimer({
       duration: seconds,
       remaining: seconds,
@@ -648,7 +648,7 @@ export default function PlanosTreino() {
   };
 
   const suggestRestTimer = (label = "Descanso sugerido", targetKey = null) => {
-    setTimerMinimizado(false);
+    setTimerMinimizado(true);
     setTimer({
       duration: descansoPadrao,
       remaining: descansoPadrao,
@@ -1757,15 +1757,30 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
       )}
 
       {timerMinimizado ? (
-        <button
-          style={{ ...S.timerPanel, width: "min(190px, calc(100vw - 24px))", padding: "10px 12px", textAlign: "left", cursor: "pointer" }}
-          onClick={() => setTimerMinimizado(false)}
+        <div
+          style={{
+            ...S.timerPanel,
+            width: "min(210px, calc(100vw - 24px))",
+            padding: "9px 10px",
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            alignItems: "center",
+            gap: 8,
+          }}
           aria-label="Abrir timer de descanso"
         >
-          <span style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer</span>
-          <strong style={{ display: "block", color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 26, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
-          <span style={{ display: "block", color: "#94a3b8", fontSize: 12 }}>▴ Toque para expandir</span>
-        </button>
+          <button
+            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", minWidth: 0 }}
+            onClick={() => setTimerMinimizado(false)}
+          >
+            <span style={{ ...S.label, margin: 0, color: timer.remaining === 0 ? "#34d399" : p.cor }}>Timer</span>
+            <strong style={{ display: "block", color: timer.remaining === 0 ? "#34d399" : "#f8fafc", fontSize: 24, lineHeight: 1 }}>{formatSeconds(timer.remaining)}</strong>
+            <span style={{ display: "block", color: "#94a3b8", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{timer.running ? "Rodando" : "Toque para abrir"}</span>
+          </button>
+          <button style={{ ...S.timerBtn, padding: "8px 9px", fontSize: 12, minWidth: 58 }} onClick={toggleTimer}>
+            {timer.running ? "Pausar" : timer.remaining === 0 ? "Repetir" : "Iniciar"}
+          </button>
+        </div>
       ) : (
         <section style={S.timerPanel} aria-label="Timer de descanso">
           <div
