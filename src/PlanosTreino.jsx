@@ -208,6 +208,76 @@ const CARDIO_OPTIONS = [
   "HIIT livre",
 ];
 const CARDIO_EMPTY = { tipo: CARDIO_OPTIONS[0], minutos: "", distancia: "", intensidade: "", obs: "" };
+const EXERCISE_ALTERNATIVES = {
+  Peito: [
+    { nome: "Supino Reto com Barra", obs: "Base de forca para peitoral, manter escapulas retraidas" },
+    { nome: "Supino Reto com Halteres", obs: "Amplitude maior, cotovelos a 45 graus" },
+    { nome: "Supino Inclinado com Halteres", obs: "Foco em peitoral superior, banco entre 30 e 45 graus" },
+    { nome: "Crucifixo com Halteres", obs: "Controle total na descida, sem abrir demais o ombro" },
+    { nome: "Crossover na Polia", obs: "Contracao forte no centro, cadencia controlada" },
+    { nome: "Flexao de Braco", obs: "Opcao pratica, ajustar inclinacao para controlar dificuldade" },
+  ],
+  Triceps: [
+    { nome: "Triceps Pulley com Corda", obs: "Cotovelo fixo e extensao completa no final" },
+    { nome: "Triceps Testa com Barra EZ", obs: "Descer controlado, sem abrir demais os cotovelos" },
+    { nome: "Triceps Frances com Haltere", obs: "Alongamento do triceps, evitar compensar lombar" },
+    { nome: "Mergulho nas Paralelas", obs: "Tronco mais vertical para priorizar triceps" },
+    { nome: "Supino Fechado", obs: "Movimento composto para triceps, punhos firmes" },
+  ],
+  Costas: [
+    { nome: "Puxada Frontal Aberta", obs: "Retrair escapulas antes de puxar a barra" },
+    { nome: "Puxada Neutra no Triangulo", obs: "Puxar cotovelos em direcao ao quadril" },
+    { nome: "Remada Curvada com Barra", obs: "Coluna neutra, barra em direcao ao umbigo" },
+    { nome: "Remada Baixa Sentada", obs: "Pausa curta na contracao, sem jogar o tronco" },
+    { nome: "Serrote com Halter", obs: "Amplitude completa e cotovelo passando do tronco" },
+    { nome: "Pullover na Polia", obs: "Cotovelo levemente flexionado, foco no grande dorsal" },
+  ],
+  Biceps: [
+    { nome: "Rosca Direta com Barra", obs: "Sem balanco, cotovelos fixos ao lado do corpo" },
+    { nome: "Rosca Alternada com Halteres", obs: "Supinar no topo e controlar a descida" },
+    { nome: "Rosca Martelo", obs: "Pegada neutra para braquial e antebraco" },
+    { nome: "Rosca Scott com Barra EZ", obs: "Isolamento maior, evitar relaxar no fim da descida" },
+    { nome: "Rosca Concentrada", obs: "Foco em controle e pico de contracao" },
+  ],
+  Pernas: [
+    { nome: "Agachamento Livre", obs: "Joelhos alinhados e tronco firme durante todo o movimento" },
+    { nome: "Leg Press 45 graus", obs: "Nao travar joelhos, controlar amplitude" },
+    { nome: "Cadeira Extensora", obs: "Pausa no topo, descida lenta" },
+    { nome: "Cadeira Flexora", obs: "Quadril fixo no banco, contrair posterior" },
+    { nome: "Stiff com Barra", obs: "Posterior e gluteos, coluna neutra" },
+    { nome: "Afundo com Halteres", obs: "Passo firme, joelho traseiro quase no chao" },
+  ],
+  Gluteos: [
+    { nome: "Elevacao Pelvica", obs: "Pausa no topo e retroversao leve da pelve" },
+    { nome: "Afundo Bulgaro", obs: "Controle no joelho da frente e tronco firme" },
+    { nome: "Cadeira Abdutora", obs: "Segurar a contracao no final da abertura" },
+    { nome: "Coice na Polia", obs: "Evitar girar quadril, movimento limpo" },
+    { nome: "Passada Caminhando", obs: "Amplitude confortavel e controle na volta" },
+  ],
+  Ombros: [
+    { nome: "Desenvolvimento com Halteres", obs: "Evitar hiperextensao lombar, punhos alinhados" },
+    { nome: "Desenvolvimento Arnold", obs: "Rotacao controlada e carga moderada" },
+    { nome: "Elevacao Lateral com Halteres", obs: "Subir ate a linha dos ombros, sem impulso" },
+    { nome: "Elevacao Lateral na Polia", obs: "Tensao constante no deltoide medial" },
+    { nome: "Face Pull", obs: "Saude do ombro, cotovelos altos e escapulas ativas" },
+    { nome: "Encolhimento com Halteres", obs: "Pausa curta no topo, sem rodar ombros" },
+  ],
+  Abdomen: [
+    { nome: "Prancha Frontal", obs: "Quadril neutro e respiracao constante" },
+    { nome: "Crunch na Polia", obs: "Flexao de tronco, sem puxar com os bracos" },
+    { nome: "Elevacao de Pernas", obs: "Controlar lombar e evitar balanco" },
+    { nome: "Pallof Press", obs: "Anti-rotacao, segurar firme na extensao" },
+    { nome: "Obliquo na Polia", obs: "Rotacao controlada, sem impulso" },
+  ],
+  Cardio: CARDIO_OPTIONS.map((nome) => ({ nome, obs: "Cardio registrado por tempo, intensidade e observacoes" })),
+  "Full Body": [
+    { nome: "Circuito Full Body", obs: "Combinar empurrar, puxar e agachar com descanso curto" },
+    { nome: "Farmer Walk", obs: "Tronco firme, passos curtos e carga desafiadora" },
+    { nome: "Remo + Agachamento Goblet", obs: "Sequencia metabolica com tecnica limpa" },
+    { nome: "Kettlebell Swing", obs: "Movimento de quadril, nao de agachamento" },
+    { nome: "Burpee Controlado", obs: "Opcao metabolica, ajustar ritmo para manter forma" },
+  ],
+};
 const WEEK_LABELS = [
   { dia: "A", prefix: "Dom", nome: "Domingo" },
   { dia: "B", prefix: "Seg", nome: "Segunda" },
@@ -428,6 +498,34 @@ function getAiConversationTitle(messages) {
   return firstUserMessage.length > 54 ? `${firstUserMessage.slice(0, 54)}...` : firstUserMessage;
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function inferExerciseGroup(exercicio, dia) {
+  const text = normalizeSearchText(`${exercicio?.nome || ""} ${exercicio?.obs || ""}`);
+  const checks = [
+    ["Triceps", ["triceps", "pulley", "frances", "mergulho", "supino fechado"]],
+    ["Biceps", ["biceps", "rosca", "martelo", "scott", "concentrada"]],
+    ["Peito", ["peito", "supino", "crucifixo", "crossover", "flexao"]],
+    ["Costas", ["costas", "puxada", "remada", "serrote", "pullover", "barra fixa", "dorsal"]],
+    ["Gluteos", ["gluteo", "pelvica", "abdutora", "coice", "bulgaro"]],
+    ["Pernas", ["perna", "agachamento", "leg press", "extensora", "flexora", "stiff", "afundo", "panturrilha"]],
+    ["Ombros", ["ombro", "desenvolvimento", "elevacao", "face pull", "encolhimento", "deltoide"]],
+    ["Abdomen", ["abdomen", "abdominal", "prancha", "crunch", "obliquo", "core", "mountain"]],
+    ["Cardio", ["cardio", "hiit", "esteira", "bike", "eliptico", "corda", "burpee"]],
+    ["Full Body", ["full body", "circuito", "farmer", "metabolico"]],
+  ];
+
+  const matched = checks.find(([, words]) => words.some((word) => text.includes(word)));
+  if (matched) return matched[0];
+
+  return (dia?.grupos || []).find((grupo) => EXERCISE_ALTERNATIVES[grupo]) || "Full Body";
+}
+
 function mergeHistory(localHistory, remoteHistory) {
   const byId = new Map();
   [...remoteHistory, ...localHistory].forEach((item) => {
@@ -445,6 +543,7 @@ export default function PlanosTreino() {
   const [diaAberto, setDiaAberto] = useState(null);
   const [editando, setEditando] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [substituindo, setSubstituindo] = useState(null);
   const [tab, setTab] = useState("planos");
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState([]);
@@ -875,6 +974,33 @@ export default function PlanosTreino() {
     const updated = JSON.parse(JSON.stringify(planos));
     updated[planoId].dias[diaIdx].exercicios.splice(exIdx, 1);
     persist(updated);
+  };
+
+  const startSubstitute = (planoId, diaIdx, exIdx) => {
+    const dia = planos[planoId].dias[diaIdx];
+    const ex = dia.exercicios[exIdx];
+    const grupo = inferExerciseGroup(ex, dia);
+    const options = EXERCISE_ALTERNATIVES[grupo] || EXERCISE_ALTERNATIVES["Full Body"];
+    setSubstituindo({ planoId, diaIdx, exIdx, grupo, options });
+  };
+
+  const substituirExercicio = (option) => {
+    if (!substituindo) return;
+
+    const { planoId, diaIdx, exIdx, grupo } = substituindo;
+    const updated = JSON.parse(JSON.stringify(planos));
+    const current = updated[planoId].dias[diaIdx].exercicios[exIdx];
+
+    updated[planoId].dias[diaIdx].exercicios[exIdx] = {
+      ...current,
+      nome: option.nome,
+      obs: option.obs,
+      grupoSubstituicao: grupo,
+      substituidoDe: current.nome,
+    };
+
+    persist(updated);
+    setSubstituindo(null);
   };
 
   const resetPlano = (planoId) => {
@@ -1401,6 +1527,9 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
                         <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14 }} onClick={() => startEdit(planoAtivo, diaIdx, exIdx)}>
                           Editar
                         </button>
+                        <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: "#FACC15" }} onClick={() => startSubstitute(planoAtivo, diaIdx, exIdx)} title="Substituir exercicio">
+                          ⇄
+                        </button>
                         <button style={{ ...S.btnGhost, padding: "7px 10px", fontSize: 14, color: p.cor }} onClick={() => startTimer(descansoPadrao, ex.nome, key)}>
                           Timer
                         </button>
@@ -1752,6 +1881,58 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
             <button style={{ ...S.btn(p.cor), width: "100%" }} onClick={saveEdit}>
               Salvar alteracoes
             </button>
+          </div>
+        </div>
+      )}
+
+      {substituindo && (
+        <div style={{ position: "fixed", inset: 0, background: "#000000dd", zIndex: 310, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "#0d1117", border: `1px solid ${p.corBorder}`, borderRadius: "8px 8px 0 0", padding: 20, width: "100%", maxHeight: "82vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div>
+                <p style={{ ...S.label, color: p.cor, marginBottom: 4 }}>Substituir exercicio</p>
+                <h3 style={{ margin: 0, fontSize: 18, color: "#f8fafc" }}>{planos[substituindo.planoId].dias[substituindo.diaIdx].exercicios[substituindo.exIdx].nome}</h3>
+              </div>
+              <button style={{ ...S.btnGhost, padding: "6px 12px", fontSize: 15 }} onClick={() => setSubstituindo(null)}>
+                Fechar
+              </button>
+            </div>
+
+            <div style={{ ...S.card, padding: 12, marginBottom: 12, background: "#111827", borderColor: "#243044" }}>
+              <p style={{ margin: "0 0 4px", color: "#94a3b8", fontSize: 14 }}>Sugestoes preferenciais do mesmo genero:</p>
+              <span style={S.badge(p.cor)}>{substituindo.grupo}</span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {substituindo.options.map((option) => {
+                const currentName = planos[substituindo.planoId].dias[substituindo.diaIdx].exercicios[substituindo.exIdx].nome;
+                const isCurrent = normalizeSearchText(option.nome) === normalizeSearchText(currentName);
+
+                return (
+                  <button
+                    key={option.nome}
+                    style={{
+                      ...S.btnGhost,
+                      width: "100%",
+                      padding: "12px 14px",
+                      textAlign: "left",
+                      color: isCurrent ? "#64748b" : "#e2e8f0",
+                      borderColor: isCurrent ? "#243044" : "#FACC1533",
+                      background: isCurrent ? "#0d1117" : "#111827",
+                      opacity: isCurrent ? 0.55 : 1,
+                    }}
+                    onClick={() => substituirExercicio(option)}
+                    disabled={isCurrent}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 5 }}>
+                      <strong style={{ color: isCurrent ? "#64748b" : "#f8fafc", fontSize: 15 }}>{option.nome}</strong>
+                      <span style={{ color: p.cor, fontWeight: 800, fontSize: 18 }}>⇄</span>
+                    </span>
+                    <span style={{ display: "block", color: "#94a3b8", fontSize: 13, lineHeight: 1.45 }}>{option.obs}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
