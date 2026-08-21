@@ -214,6 +214,15 @@ const WEEK_LABELS = [
   { dia: "C", prefix: "Ter", nome: "Terca" },
   { dia: "D", prefix: "Qua", nome: "Quarta" },
 ];
+const PRESENCE_DAYS = [
+  { label: "S", nome: "Segunda" },
+  { label: "T", nome: "Terca" },
+  { label: "Q", nome: "Quarta" },
+  { label: "QQ", nome: "Quinta" },
+  { label: "S", nome: "Sexta" },
+  { label: "SS", nome: "Sabado" },
+  { label: "D", nome: "Domingo" },
+];
 
 function cloneBase() {
   return JSON.parse(JSON.stringify(PLANOS_BASE));
@@ -371,6 +380,47 @@ function formatAiHistoryDate(value) {
   } catch {
     return "";
   }
+}
+
+function getDateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getWeekStartMonday(reference = new Date()) {
+  const start = new Date(reference);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  return start;
+}
+
+function getWeeklyPresence(history, reference = new Date()) {
+  const weekStart = getWeekStartMonday(reference);
+  const completedDates = new Set(
+    (history || [])
+      .map((item) => getDateKey(item.finishedAt || item.startedAt))
+      .filter(Boolean)
+  );
+
+  return PRESENCE_DAYS.map((day, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    const key = getDateKey(date);
+
+    return {
+      ...day,
+      key,
+      date,
+      completed: completedDates.has(key),
+    };
+  });
 }
 
 function getAiConversationTitle(messages) {
@@ -917,6 +967,8 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
 
   const p = plano;
   const visibleAiHistory = showAllAiHistory ? aiHistory : aiHistory.slice(0, 5);
+  const weeklyPresence = getWeeklyPresence(historico, new Date(sessionNow));
+  const weeklyPresenceCount = weeklyPresence.filter((day) => day.completed).length;
 
   const S = {
     app: {
@@ -1092,6 +1144,41 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
       </div>
 
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
+
+      <div style={{ padding: "18px 20px 0" }}>
+        <div style={{ ...S.card, padding: "14px 16px", marginBottom: 0, background: "#0d1117", borderColor: "#243044" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <p style={{ ...S.label, margin: 0, color: "#94a3b8" }}>Presenca semanal</p>
+            <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{weeklyPresenceCount}/7</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+            {weeklyPresence.map((day) => (
+              <div key={day.key} title={day.nome} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: day.completed ? "#FACC15" : "transparent",
+                    border: `2px solid ${day.completed ? "#FACC15" : "#334155"}`,
+                    color: day.completed ? "#0a0a0a" : "#94a3b8",
+                    fontSize: day.label.length > 1 ? 11 : 13,
+                    fontWeight: 800,
+                    boxShadow: day.completed ? "0 0 18px #FACC1544" : "none",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {day.label}
+                </div>
+                <span style={{ fontSize: 10, color: day.completed ? "#FACC15" : "#475569", fontWeight: 700 }}>{day.completed ? "ok" : "--"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <div style={{ padding: "20px 20px 0", display: "flex", gap: 10 }}>
         {Object.values(planos).map((pl) => (
