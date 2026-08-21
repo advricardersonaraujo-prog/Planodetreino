@@ -1200,7 +1200,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
                       <div style={{ flex: 1 }}>
                         <p style={{ margin: "0 0 6px", fontSize: 16, color: "#f1f5f9", fontWeight: 700 }}>{ex.nome}</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: ex.obs ? 6 : 8 }}>
-                          <span style={S.badge("#22d3ee")}>{ex.series} series</span>
+                          <span style={S.badge("#facc15")}>{ex.series} series</span>
                           <span style={S.badge("#a78bfa")}>{ex.reps} reps</span>
                           {ex.carga && <span style={S.badge("#f97316")}>{ex.carga}</span>}
                           {diaTreinoAtivo && <span style={S.badge(done >= totalSeries && totalSeries > 0 ? "#34d399" : "#64748b")}>{done}/{ex.series} feitas</span>}
@@ -1291,8 +1291,8 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
             ))}
           </div>
 
-          <div style={{ ...S.card, borderColor: "#22d3ee33" }}>
-            <p style={{ ...S.label, color: "#22d3ee" }}>Dicas de progressao</p>
+          <div style={{ ...S.card, borderColor: "#facc1533" }}>
+            <p style={{ ...S.label, color: "#facc15" }}>Dicas de progressao</p>
             {[
               "Aumente 2.5-5kg quando completar todas as series/reps na forma correta.",
               "Se nao completar 2/3 das series, mantenha a carga por mais uma semana.",
@@ -1301,7 +1301,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
               "Fase de queima: nao reduza carga; reduza descanso e aumente volume.",
             ].map((tip) => (
               <p key={tip} style={{ margin: "0 0 8px", fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
-                <span style={{ color: "#22d3ee" }}>▸ </span>
+                <span style={{ color: "#facc15" }}>▸ </span>
                 {tip}
               </p>
             ))}
