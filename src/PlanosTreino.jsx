@@ -757,11 +757,11 @@ export default function PlanosTreino() {
     setAiInput("");
     setAiLoading(true);
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
     if (!apiKey) {
       setAiMessages((prev) => [...prev, {
         role: "assistant",
-        text: "⚠️ Chave da API Gemini não configurada.\n\nAdicione VITE_GEMINI_API_KEY no arquivo .env ou nas variáveis de ambiente do Vercel/Netlify.\n\nObttenha sua chave gratuita em: aistudio.google.com",
+        text: "Chave da API Groq nao configurada.\n\nAdicione VITE_GROQ_API_KEY no arquivo .env ou nas variaveis de ambiente do Vercel/Netlify.\n\nObtenha sua chave em: console.groq.com/keys",
       }]);
       setAiLoading(false);
       return;
@@ -784,36 +784,40 @@ Plano ativo: ${plano.nome} — ${plano.subtitulo}
 
 Responda sempre em português, de forma direta, prática e motivadora. Foque em progressão de carga, técnica correta e segurança. Máximo 300 palavras por resposta.`;
 
-    const contents = newMessages.map((m) => ({
-      role: m.role === "user" ? "user" : "model",
-      parts: [{ text: m.text }],
-    }));
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...newMessages.map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.text,
+      })),
+    ];
 
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents,
-            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-          }),
-        }
-      );
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages,
+          max_tokens: 512,
+          temperature: 0.7,
+        }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error?.message || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text
+      const reply = data.choices?.[0]?.message?.content
         || "Não consegui gerar uma resposta. Tente novamente.";
       setAiMessages((prev) => [...prev, { role: "assistant", text: reply }]);
     } catch (err) {
       setAiMessages((prev) => [...prev, {
         role: "assistant",
-        text: `❌ Erro ao conectar com Gemini: ${err.message}`,
+        text: `Erro ao conectar com Groq: ${err.message}`,
       }]);
     } finally {
       setAiLoading(false);
@@ -1412,7 +1416,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
         <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column" }}>
           {aiMessages.length === 0 && (
             <div style={{ marginBottom: 12 }}>
-              <p style={{ ...S.label, color: "#FACC15", marginBottom: 10 }}>Coach IA — Gemini</p>
+              <p style={{ ...S.label, color: "#FACC15", marginBottom: 10 }}>Coach IA - Groq</p>
               <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 14px", lineHeight: 1.6 }}>Seu coach conhece seus 3 planos e responde duvidas sobre treino, progressao e execucao.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[

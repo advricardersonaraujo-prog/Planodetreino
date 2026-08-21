@@ -21,6 +21,17 @@ O app funciona offline com `localStorage` e tambem esta preparado para sincroniz
 
 Depois disso, abra a aba Historico no app, informe seu e-mail e use o link magico de acesso. Cada treino encerrado sera salvo localmente e sincronizado na nuvem.
 
+## Coach IA com Groq
+
+O Coach IA usa a API da Groq pelo endpoint compativel com OpenAI.
+
+1. Crie uma chave em https://console.groq.com/keys.
+2. Na Vercel, em Settings > Environment Variables, adicione:
+   - `VITE_GROQ_API_KEY`
+3. Faca um novo deploy.
+
+Modelo usado no app: `llama-3.3-70b-versatile`.
+
 ## Rodar localmente
 
 ```bash
@@ -104,4 +115,4 @@ http://localhost:5173
 
 - O app salva edicoes e historico no `localStorage` do navegador.
 - Com Supabase configurado, o historico de treinos sincroniza entre dispositivos com login por e-mail.
-- O Coach IA esta offline/local. Para IA real, use um backend proxy para proteger a chave da API.
+- O Coach IA usa Groq quando `VITE_GROQ_API_KEY` esta configurada.
