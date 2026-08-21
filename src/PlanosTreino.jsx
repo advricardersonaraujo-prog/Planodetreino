@@ -493,6 +493,21 @@ function getWeeklyPresence(history, reference = new Date()) {
   });
 }
 
+function getPresenceThermometer(count) {
+  const phrases = [
+    "Zero presencas. A academia ja abriu boletim de desaparecimento.",
+    "Primeira marcacao. O motor tossiu, mas pegou.",
+    "Duas presencas. Ja da para chamar de rotina sem rir muito.",
+    "Tres treinos. A semana comecou a respeitar voce.",
+    "Quatro treinos. Agora sim, o sofa esta perdendo a discussao.",
+    "Cinco treinos. Modo serio ativado, com leve cheiro de superacao.",
+    "Seis presencas. A planilha esta quase pedindo descanso.",
+    "Sete de sete. Calma, atleta, deixa um pouco de gloria para os mortais.",
+  ];
+
+  return phrases[Math.max(0, Math.min(phrases.length - 1, count))];
+}
+
 function getAiConversationTitle(messages) {
   const firstUserMessage = messages.find((message) => message.role === "user")?.text || "Nova conversa";
   return firstUserMessage.length > 54 ? `${firstUserMessage.slice(0, 54)}...` : firstUserMessage;
@@ -1095,6 +1110,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
   const visibleAiHistory = showAllAiHistory ? aiHistory : aiHistory.slice(0, 5);
   const weeklyPresence = getWeeklyPresence(historico, new Date(sessionNow));
   const weeklyPresenceCount = weeklyPresence.filter((day) => day.completed).length;
+  const weeklyPresencePhrase = getPresenceThermometer(weeklyPresenceCount);
 
   const S = {
     app: {
@@ -1332,6 +1348,11 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
                 <span style={{ fontSize: 10, color: day.completed ? "#FACC15" : "#475569", fontWeight: 700 }}>{day.completed ? "ok" : "--"}</span>
               </div>
             ))}
+          </div>
+          <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "#0a0a0a", border: "1px solid #243044" }}>
+            <p style={{ margin: 0, color: weeklyPresenceCount >= 5 ? "#FACC15" : "#94a3b8", fontSize: 13, lineHeight: 1.45, textAlign: "center", fontWeight: 700 }}>
+              {weeklyPresencePhrase}
+            </p>
           </div>
         </div>
       </div>
