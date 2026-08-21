@@ -196,7 +196,10 @@ const PLANOS_BASE = {
 const STORAGE_KEY = "planos_treino_v2";
 const HISTORY_KEY = "planos_treino_historico_v1";
 const AI_HISTORY_KEY = "planos_treino_ai_conversas_v1";
+const MEASURES_KEY = "planos_treino_medidas_v1";
+const SETTINGS_KEY = "planos_treino_config_v1";
 const DEFAULT_REST_SECONDS = 50;
+const DEFAULT_SETTINGS = { restSeconds: DEFAULT_REST_SECONDS, theme: "gold", compactMode: true };
 const CARDIO_OPTIONS = [
   "Esteira - caminhada inclinada",
   "Esteira - corrida",
@@ -420,6 +423,41 @@ function saveAiHistory(history) {
   }
 }
 
+function loadMeasures() {
+  try {
+    const raw = localStorage.getItem(MEASURES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMeasures(measures) {
+  try {
+    localStorage.setItem(MEASURES_KEY, JSON.stringify(measures));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return { ...DEFAULT_SETTINGS, ...(raw ? JSON.parse(raw) : {}) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
 function secondsFromRest(rest) {
   const values = String(rest).match(/\d+/g)?.map(Number) || [];
   return values.length ? Math.max(...values) : DEFAULT_REST_SECONDS;
@@ -460,6 +498,41 @@ function getDateKey(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function todayInputDate() {
+  return getDateKey(new Date());
+}
+
+function emptyMeasureForm() {
+  return {
+    date: todayInputDate(),
+    peso: "",
+    cintura: "",
+    braco: "",
+    peito: "",
+    quadril: "",
+    coxa: "",
+    obs: "",
+  };
+}
+
+function formatMeasureValue(value, unit = "") {
+  if (value === "" || value === null || value === undefined) return "--";
+  return `${value}${unit}`;
+}
+
+function formatInputDate(value) {
+  const parts = String(value || "").split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return value || "--";
+}
+
+function measureDelta(current, previous, field) {
+  const currentValue = Number(current?.[field]);
+  const previousValue = Number(previous?.[field]);
+  if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) return null;
+  return currentValue - previousValue;
 }
 
 function getWeekStartMonday(reference = new Date()) {
@@ -578,6 +651,7 @@ export default function PlanosTreino() {
   const [editando, setEditando] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [substituindo, setSubstituindo] = useState(null);
+  const [menuAberto, setMenuAberto] = useState(false);
   const [tab, setTab] = useState("planos");
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState([]);
@@ -587,6 +661,9 @@ export default function PlanosTreino() {
   const [aiLoading, setAiLoading] = useState(false);
   const [treinoSessao, setTreinoSessao] = useState(null);
   const [historico, setHistorico] = useState(loadHistory);
+  const [medidas, setMedidas] = useState(loadMeasures);
+  const [medidaForm, setMedidaForm] = useState(emptyMeasureForm);
+  const [settings, setSettings] = useState(loadSettings);
   const [cardioForm, setCardioForm] = useState(CARDIO_EMPTY);
   const [authEmail, setAuthEmail] = useState("");
   const [authUser, setAuthUser] = useState(null);
@@ -600,8 +677,8 @@ export default function PlanosTreino() {
   const [presenceWeekOffset, setPresenceWeekOffset] = useState(0);
   const [sessionNow, setSessionNow] = useState(Date.now());
   const [timer, setTimer] = useState({
-    duration: DEFAULT_REST_SECONDS,
-    remaining: DEFAULT_REST_SECONDS,
+    duration: loadSettings().restSeconds || DEFAULT_REST_SECONDS,
+    remaining: loadSettings().restSeconds || DEFAULT_REST_SECONDS,
     running: false,
     label: "Descanso",
     targetKey: null,
@@ -615,7 +692,7 @@ export default function PlanosTreino() {
   };
 
   const plano = planos[planoAtivo];
-  const descansoPadrao = DEFAULT_REST_SECONDS;
+  const descansoPadrao = settings.restSeconds || DEFAULT_REST_SECONDS;
   const timerPercent = timer.duration ? Math.max(0, Math.min(100, (timer.remaining / timer.duration) * 100)) : 0;
   const treinoAtivo = Boolean(treinoSessao);
   const activeDayKey = treinoSessao ? `${treinoSessao.planoId}:${treinoSessao.diaIdx}` : null;
@@ -630,6 +707,61 @@ export default function PlanosTreino() {
     const merged = mergeHistory(updated, []);
     setHistorico(merged);
     saveHistory(merged);
+  };
+
+  const persistMeasures = (updated) => {
+    const clean = updated
+      .filter((item) => item?.id && item?.date)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 200);
+    setMedidas(clean);
+    saveMeasures(clean);
+  };
+
+  const persistSettings = (updated) => {
+    const clean = { ...DEFAULT_SETTINGS, ...updated };
+    setSettings(clean);
+    saveSettings(clean);
+  };
+
+  const openMenuModule = (nextTab) => {
+    setTab(nextTab);
+    setMenuAberto(false);
+  };
+
+  const saveMeasureCheckin = () => {
+    if (!medidaForm.date) {
+      window.alert("Informe a data do check-in.");
+      return;
+    }
+
+    const hasMeasure = ["peso", "cintura", "braco", "peito", "quadril", "coxa"].some((field) => String(medidaForm[field]).trim() !== "");
+    if (!hasMeasure) {
+      window.alert("Informe pelo menos uma medida para salvar.");
+      return;
+    }
+
+    const record = {
+      id: `medida_${Date.now()}`,
+      ...medidaForm,
+      createdAt: new Date().toISOString(),
+    };
+
+    persistMeasures([record, ...medidas]);
+    setMedidaForm(emptyMeasureForm());
+  };
+
+  const removeMeasureCheckin = (id) => {
+    persistMeasures(medidas.filter((item) => item.id !== id));
+  };
+
+  const updateRestSeconds = (seconds) => {
+    persistSettings({ ...settings, restSeconds: seconds });
+    setTimer((current) => (
+      current.running
+        ? current
+        : { ...current, duration: seconds, remaining: seconds, label: "Descanso" }
+    ));
   };
 
   const persistAiHistory = (updated) => {
@@ -1133,6 +1265,15 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
   const weeklyPresenceCount = weeklyPresence.filter((day) => day.completed).length;
   const weeklyPresencePhrase = getPresenceThermometer(weeklyPresenceCount);
   const weeklyPresenceRange = formatWeekRange(weeklyReference);
+  const sortedMedidas = [...medidas].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const ultimaMedida = sortedMedidas[0];
+  const medidaAnterior = sortedMedidas[1];
+  const renderMeasureDelta = (field, unit = "") => {
+    const delta = measureDelta(ultimaMedida, medidaAnterior, field);
+    if (delta === null || delta === 0) return null;
+    const sign = delta > 0 ? "+" : "";
+    return `${sign}${delta.toFixed(1)}${unit}`;
+  };
 
   const S = {
     app: {
@@ -1328,6 +1469,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
             flexShrink: 0,
             boxShadow: `0 6px 20px ${p.cor}18`,
           }}
+          onClick={() => setMenuAberto(true)}
           aria-label="Abrir menu"
           title="Menu"
         >
@@ -1336,6 +1478,55 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
           ))}
         </button>
       </div>
+
+      {menuAberto && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 260, display: "flex", justifyContent: "flex-end" }}>
+          <button
+            style={{ position: "absolute", inset: 0, border: "none", background: "#000000aa", cursor: "pointer" }}
+            onClick={() => setMenuAberto(false)}
+            aria-label="Fechar menu"
+          />
+          <aside style={{ position: "relative", width: "min(340px, 88vw)", height: "100%", background: "#0d1117", borderLeft: `1px solid ${p.corBorder}`, padding: 20, boxShadow: "-18px 0 44px #00000088", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18 }}>
+              <div>
+                <p style={{ ...S.label, color: p.cor, marginBottom: 4 }}>Menu</p>
+                <h2 style={{ margin: 0, color: "#f8fafc", fontSize: 22 }}>Módulos</h2>
+              </div>
+              <button style={{ ...S.btnGhost, padding: "8px 12px" }} onClick={() => setMenuAberto(false)}>
+                Fechar
+              </button>
+            </div>
+
+            {[
+              { id: "medidas", label: "Medidas Corporais", desc: "Peso, cintura, braço, peito, check-ins e evolução.", icon: "📏" },
+              { id: "configuracoes", label: "Configurações", desc: "Timer, tema, sincronização e login/Supabase.", icon: "⚙️" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                style={{
+                  ...S.btnGhost,
+                  width: "100%",
+                  padding: "14px",
+                  marginBottom: 10,
+                  textAlign: "left",
+                  background: tab === item.id ? "#1a1500" : "#111827",
+                  borderColor: tab === item.id ? "#FACC1555" : "#243044",
+                  color: "#e2e8f0",
+                }}
+                onClick={() => openMenuModule(item.id)}
+              >
+                <span style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>{item.icon}</span>
+                  <span>
+                    <strong style={{ display: "block", color: tab === item.id ? p.cor : "#f8fafc", fontSize: 15, marginBottom: 4 }}>{item.label}</strong>
+                    <span style={{ display: "block", color: "#94a3b8", fontSize: 13, lineHeight: 1.45 }}>{item.desc}</span>
+                  </span>
+                </span>
+              </button>
+            ))}
+          </aside>
+        </div>
+      )}
 
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
 
@@ -1481,7 +1672,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {Object.entries(p.parametros).map(([k, v]) => (
                 <span key={k} style={S.badge(p.cor)}>
-                  {k}: {v}
+                  {k}: {k === "descanso" ? `${descansoPadrao}s` : v}
                 </span>
               ))}
             </div>
@@ -1817,6 +2008,221 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {tab === "medidas" && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
+            <p style={{ ...S.label, color: p.cor }}>Medidas corporais</p>
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+              Registre check-ins para acompanhar peso, cintura, braço, peito, quadril, coxa e evolução ao longo das semanas.
+            </p>
+          </div>
+
+          {ultimaMedida && (
+            <div style={S.card}>
+              <p style={{ ...S.label, color: "#34d399" }}>Último check-in</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                {[
+                  ["peso", "Peso", "kg"],
+                  ["cintura", "Cintura", "cm"],
+                  ["braco", "Braço", "cm"],
+                  ["peito", "Peito", "cm"],
+                  ["quadril", "Quadril", "cm"],
+                  ["coxa", "Coxa", "cm"],
+                ].map(([field, label, unit]) => {
+                  const delta = renderMeasureDelta(field, unit);
+                  return (
+                    <div key={field} style={{ padding: 12, border: "1px solid #243044", borderRadius: 10, background: "#0d1117" }}>
+                      <p style={{ margin: "0 0 4px", color: "#64748b", fontSize: 12, fontWeight: 700 }}>{label}</p>
+                      <strong style={{ color: "#f8fafc", fontSize: 20 }}>{formatMeasureValue(ultimaMedida[field], unit)}</strong>
+                      {delta && <span style={{ display: "block", color: delta.startsWith("+") ? "#FACC15" : "#34d399", fontSize: 12, marginTop: 3 }}>{delta} vs. anterior</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <p style={{ margin: "10px 0 0", color: "#64748b", fontSize: 13 }}>Data: {formatInputDate(ultimaMedida.date)}</p>
+            </div>
+          )}
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Novo check-in</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <label style={S.label}>Data</label>
+                <input style={S.input} type="date" value={medidaForm.date} onChange={(event) => setMedidaForm((current) => ({ ...current, date: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Peso (kg)</label>
+                <input style={S.input} type="number" step="0.1" value={medidaForm.peso} onChange={(event) => setMedidaForm((current) => ({ ...current, peso: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Cintura (cm)</label>
+                <input style={S.input} type="number" step="0.1" value={medidaForm.cintura} onChange={(event) => setMedidaForm((current) => ({ ...current, cintura: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Braço (cm)</label>
+                <input style={S.input} type="number" step="0.1" value={medidaForm.braco} onChange={(event) => setMedidaForm((current) => ({ ...current, braco: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Peito (cm)</label>
+                <input style={S.input} type="number" step="0.1" value={medidaForm.peito} onChange={(event) => setMedidaForm((current) => ({ ...current, peito: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Quadril (cm)</label>
+                <input style={S.input} type="number" step="0.1" value={medidaForm.quadril} onChange={(event) => setMedidaForm((current) => ({ ...current, quadril: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Coxa (cm)</label>
+                <input style={S.input} type="number" step="0.1" value={medidaForm.coxa} onChange={(event) => setMedidaForm((current) => ({ ...current, coxa: event.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Foto/check-in</label>
+                <input style={S.input} placeholder="Ex: foto salva no celular" value={medidaForm.foto || ""} onChange={(event) => setMedidaForm((current) => ({ ...current, foto: event.target.value }))} />
+              </div>
+            </div>
+            <label style={S.label}>Observações</label>
+            <textarea
+              style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 10 }}
+              placeholder="Ex: jejum, pós-treino, foto frontal/lateral registrada"
+              value={medidaForm.obs}
+              onChange={(event) => setMedidaForm((current) => ({ ...current, obs: event.target.value }))}
+            />
+            <button style={{ ...S.btn(p.cor), width: "100%", color: "#0a0a0a" }} onClick={saveMeasureCheckin}>
+              Salvar check-in
+            </button>
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Histórico e evolução</p>
+            {sortedMedidas.length === 0 ? (
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15 }}>Nenhum check-in registrado ainda.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {sortedMedidas.map((item) => (
+                  <div key={item.id} style={{ border: "1px solid #243044", borderRadius: 10, padding: 12, background: "#0d1117" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                      <strong style={{ color: "#f8fafc" }}>{formatInputDate(item.date)}</strong>
+                      <button style={{ ...S.btnGhost, padding: "5px 8px", color: "#ef4444", fontSize: 12 }} onClick={() => removeMeasureCheckin(item.id)}>
+                        Excluir
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {[
+                        ["Peso", item.peso, "kg"],
+                        ["Cintura", item.cintura, "cm"],
+                        ["Braço", item.braco, "cm"],
+                        ["Peito", item.peito, "cm"],
+                        ["Quadril", item.quadril, "cm"],
+                        ["Coxa", item.coxa, "cm"],
+                      ].map(([label, value, unit]) => value && <span key={label} style={S.badge("#FACC15")}>{label}: {value}{unit}</span>)}
+                    </div>
+                    {item.foto && <p style={{ margin: "8px 0 0", color: "#94a3b8", fontSize: 13 }}>Foto/check-in: {item.foto}</p>}
+                    {item.obs && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13, lineHeight: 1.5 }}>{item.obs}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "configuracoes" && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
+            <p style={{ ...S.label, color: p.cor }}>Configurações</p>
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
+              Ajustes rápidos para o timer, dias de treino, visual e sincronização.
+            </p>
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Timer padrão</p>
+            <strong style={{ display: "block", color: "#f8fafc", fontSize: 28, marginBottom: 10 }}>{formatSeconds(descansoPadrao)}</strong>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {[30, 45, 50, 60, 75, 90].map((seconds) => (
+                <button
+                  key={seconds}
+                  style={{
+                    ...S.btnGhost,
+                    color: descansoPadrao === seconds ? "#0a0a0a" : "#e2e8f0",
+                    background: descansoPadrao === seconds ? "#FACC15" : "#111827",
+                    borderColor: descansoPadrao === seconds ? "#FACC15" : "#243044",
+                    fontWeight: 800,
+                  }}
+                  onClick={() => updateRestSeconds(seconds)}
+                >
+                  {formatSeconds(seconds)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Dias de treino ativos</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {["Domingo", "Segunda", "Terça", "Quarta", "Sexta"].map((day) => (
+                <span key={day} style={S.badge("#FACC15")}>{day}</span>
+              ))}
+            </div>
+            <p style={{ margin: "10px 0 0", color: "#64748b", fontSize: 13, lineHeight: 1.5 }}>
+              Estes são os dias usados pelos planos atuais. A edição livre dos dias pode entrar na próxima rodada.
+            </p>
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: p.cor }}>Tema e tela</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button style={{ ...S.btnGhost, color: "#0a0a0a", background: "#FACC15", borderColor: "#FACC15", fontWeight: 800 }} onClick={() => persistSettings({ ...settings, theme: "gold" })}>
+                Amarelo atual
+              </button>
+              <button style={{ ...S.btnGhost, color: settings.compactMode ? "#0a0a0a" : "#e2e8f0", background: settings.compactMode ? "#FACC15" : "#111827", borderColor: settings.compactMode ? "#FACC15" : "#243044", fontWeight: 800 }} onClick={() => persistSettings({ ...settings, compactMode: !settings.compactMode })}>
+                Compacto {settings.compactMode ? "on" : "off"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ ...S.card, borderColor: authUser ? "#34d39955" : "#1e2938" }}>
+            <p style={{ ...S.label, color: authUser ? "#34d399" : p.cor }}>Conta e sincronização</p>
+            {!isSupabaseConfigured ? (
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>Supabase não configurado neste ambiente.</p>
+            ) : authUser ? (
+              <div>
+                <p style={{ margin: "0 0 10px", color: "#94a3b8", fontSize: 15 }}>
+                  Conectado como <strong style={{ color: "#e2e8f0" }}>{authUser.email}</strong>
+                </p>
+                <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>{syncStatus}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button style={{ ...S.btn("#16a34a"), opacity: syncLoading ? 0.6 : 1 }} onClick={() => syncHistoryFromCloud(authUser)} disabled={syncLoading}>
+                    Sincronizar
+                  </button>
+                  <button style={S.btnGhost} onClick={sairDaConta}>Sair</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ margin: "0 0 10px", color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>Entre com seu e-mail para sincronizar treinos na nuvem.</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                  <input style={S.input} type="email" placeholder="seu@email.com" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
+                  <button style={{ ...S.btn(p.corBorder), opacity: syncLoading ? 0.6 : 1 }} onClick={enviarLinkLogin} disabled={syncLoading}>Enviar link</button>
+                </div>
+                <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>{syncStatus}</p>
+              </div>
+            )}
+          </div>
+
+          <div style={S.card}>
+            <p style={{ ...S.label, color: "#ef4444" }}>Dados</p>
+            <button
+              style={{ ...S.btnGhost, width: "100%", color: "#ef4444", borderColor: "#ef444455" }}
+              onClick={() => {
+                if (window.confirm("Resetar este plano para o padrão?")) resetPlano(planoAtivo);
+              }}
+            >
+              Resetar plano atual
+            </button>
+          </div>
         </div>
       )}
 
