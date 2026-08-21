@@ -201,17 +201,21 @@ const SETTINGS_KEY = "planos_treino_config_v1";
 const CALORIE_HISTORY_KEY = "planos_treino_calorias_v1";
 const DEFAULT_REST_SECONDS = 50;
 const DEFAULT_SETTINGS = { restSeconds: DEFAULT_REST_SECONDS, theme: "gold", compactMode: true };
-const CALORIE_ACTIVITIES = [
-  { id: "musculacao_moderada", nome: "Musculação moderada", met: 5.0 },
-  { id: "musculacao_intensa", nome: "Musculação intensa", met: 6.0 },
-  { id: "caminhada", nome: "Caminhada rápida", met: 4.3 },
-  { id: "esteira_inclinada", nome: "Esteira inclinada", met: 6.5 },
-  { id: "corrida_leve", nome: "Corrida leve", met: 8.3 },
-  { id: "bike_moderada", nome: "Bike moderada", met: 6.8 },
-  { id: "eliptico", nome: "Elíptico", met: 5.0 },
-  { id: "hiit", nome: "HIIT / circuito", met: 8.0 },
+const ACTIVITY_FACTORS = [
+  { id: "sedentario", nome: "Sedentário", desc: "Pouco ou nenhum exercício", fator: 1.2 },
+  { id: "leve", nome: "Levemente ativo", desc: "Exercício leve 1-3 dias/semana", fator: 1.375 },
+  { id: "moderado", nome: "Moderadamente ativo", desc: "Treino 3-5 dias/semana", fator: 1.55 },
+  { id: "alto", nome: "Muito ativo", desc: "Treino intenso 5-6 dias/semana", fator: 1.725 },
+  { id: "extremo", nome: "Extremamente ativo", desc: "Treino pesado diário ou 2x/dia", fator: 1.9 },
 ];
-const CALORIE_EMPTY = { peso: "", minutos: "", atividadeId: CALORIE_ACTIVITIES[0].id, intensidade: "padrao" };
+const CALORIE_GOALS = [
+  { id: "perder_lento", nome: "Perder gordura leve", ajuste: -300, desc: "Déficit conservador" },
+  { id: "perder", nome: "Perder gordura", ajuste: -500, desc: "Déficit moderado" },
+  { id: "manter", nome: "Manter peso", ajuste: 0, desc: "Manutenção" },
+  { id: "ganhar_lento", nome: "Ganhar massa leve", ajuste: 250, desc: "Superávit controlado" },
+  { id: "ganhar", nome: "Ganhar massa", ajuste: 400, desc: "Superávit moderado" },
+];
+const CALORIE_EMPTY = { sexo: "masculino", peso: "", altura: "", idade: "", atividadeId: "moderado", objetivoId: "manter" };
 const CARDIO_OPTIONS = [
   "Esteira - caminhada inclinada",
   "Esteira - corrida",
@@ -565,25 +569,32 @@ function measureDelta(current, previous, field) {
   return currentValue - previousValue;
 }
 
-function getCalorieActivity(activityId) {
-  return CALORIE_ACTIVITIES.find((activity) => activity.id === activityId) || CALORIE_ACTIVITIES[0];
+function getActivityFactor(activityId) {
+  return ACTIVITY_FACTORS.find((activity) => activity.id === activityId) || ACTIVITY_FACTORS[2];
 }
 
-function getAdjustedMet(activity, intensity) {
-  const factors = { leve: 0.85, padrao: 1, intensa: 1.18 };
-  return activity.met * (factors[intensity] || 1);
+function getCalorieGoal(goalId) {
+  return CALORIE_GOALS.find((goal) => goal.id === goalId) || CALORIE_GOALS[2];
 }
 
-function calculateCalories({ peso, minutos, atividadeId, intensidade }) {
+function calculateCalories({ sexo, peso, altura, idade, atividadeId, objetivoId }) {
   const weight = Number(peso);
-  const duration = Number(minutos);
-  if (!weight || !duration || weight <= 0 || duration <= 0) return null;
+  const height = Number(altura);
+  const age = Number(idade);
+  if (!weight || !height || !age || weight <= 0 || height <= 0 || age <= 0) return null;
 
-  const activity = getCalorieActivity(atividadeId);
-  const met = getAdjustedMet(activity, intensidade);
-  const calories = Math.round((met * 3.5 * weight * duration) / 200);
+  const base = sexo === "feminino"
+    ? 655.1 + (9.563 * weight) + (1.85 * height) - (4.676 * age)
+    : 66.5 + (13.75 * weight) + (5.003 * height) - (6.755 * age);
+  const activity = getActivityFactor(atividadeId);
+  const goal = getCalorieGoal(objetivoId);
+  const tmb = Math.round(base);
+  const maintenance = Math.round(base * activity.fator);
+  const target = Math.max(1200, Math.round(maintenance + goal.ajuste));
+  const proteinMin = Math.round(weight * 1.8);
+  const proteinMax = Math.round(weight * 2.2);
 
-  return { activity, met, calories, weight, duration };
+  return { sexo, weight, height, age, activity, goal, tmb, maintenance, target, proteinMin, proteinMax };
 }
 
 function getWeekStartMonday(reference = new Date()) {
@@ -886,7 +897,7 @@ export default function PlanosTreino() {
 
   const saveCalorieEstimate = () => {
     if (!calorieResult) {
-      window.alert("Informe peso e tempo válidos para calcular.");
+      window.alert("Informe sexo, peso, altura e idade para calcular.");
       return;
     }
 
@@ -894,11 +905,17 @@ export default function PlanosTreino() {
       id: `caloria_${Date.now()}`,
       createdAt: new Date().toISOString(),
       peso: calorieResult.weight,
-      minutos: calorieResult.duration,
+      altura: calorieResult.height,
+      idade: calorieResult.age,
+      sexo: calorieResult.sexo,
       atividade: calorieResult.activity.nome,
-      intensidade: calorieForm.intensidade,
-      met: Number(calorieResult.met.toFixed(1)),
-      calorias: calorieResult.calories,
+      fator: calorieResult.activity.fator,
+      objetivo: calorieResult.goal.nome,
+      ajuste: calorieResult.goal.ajuste,
+      tmb: calorieResult.tmb,
+      manutencao: calorieResult.maintenance,
+      calorias: calorieResult.target,
+      proteina: `${calorieResult.proteinMin}-${calorieResult.proteinMax}g`,
     };
 
     persistCalorieHistory([record, ...calorieHistory]);
@@ -1646,7 +1663,7 @@ Formato obrigatório para celular:
 
             {[
               { id: "medidas", label: "Medidas Corporais", desc: "Peso, cintura, braço, peito, check-ins e evolução.", icon: "📏" },
-              { id: "calorias", label: "Gasto Calórico", desc: "Calcule gasto estimado por atividade, tempo e peso.", icon: "🔥" },
+              { id: "calorias", label: "Calculadora TMB", desc: "Metabolismo basal, gasto diário e meta calórica.", icon: "🔥" },
               { id: "configuracoes", label: "Configurações", desc: "Timer, tema, sincronização e login/Supabase.", icon: "⚙️" },
             ].map((item) => (
               <button
@@ -2279,14 +2296,35 @@ Formato obrigatório para celular:
       {tab === "calorias" && (
         <div style={{ padding: "12px 16px 0" }}>
           <div style={{ ...S.card, borderLeft: `3px solid ${p.cor}` }}>
-            <p style={{ ...S.label, color: p.cor }}>Calculadora de gasto calórico</p>
+            <p style={{ ...S.label, color: p.cor }}>Calculadora TMB</p>
             <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.5 }}>
-              Estimativa padrão por MET. Preencha peso, atividade e tempo para calcular o gasto aproximado do treino.
+              Estime seu metabolismo basal, gasto diário e uma meta de calorias conforme atividade e objetivo.
             </p>
           </div>
 
           <div style={S.card}>
-            <p style={{ ...S.label, color: p.cor }}>Dados do treino</p>
+            <p style={{ ...S.label, color: p.cor }}>Dados corporais</p>
+            <label style={S.label}>Sexo</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              {[
+                ["masculino", "Masculino"],
+                ["feminino", "Feminino"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  style={{
+                    ...S.btnGhost,
+                    color: calorieForm.sexo === id ? "#0a0a0a" : "#e2e8f0",
+                    background: calorieForm.sexo === id ? "#FACC15" : "#111827",
+                    borderColor: calorieForm.sexo === id ? "#FACC15" : "#243044",
+                    fontWeight: 800,
+                  }}
+                  onClick={() => setCalorieForm((current) => ({ ...current, sexo: id }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div>
                 <label style={S.label}>Peso (kg)</label>
@@ -2300,50 +2338,64 @@ Formato obrigatório para celular:
                 />
               </div>
               <div>
-                <label style={S.label}>Tempo (min)</label>
+                <label style={S.label}>Altura (cm)</label>
                 <input
                   style={S.input}
                   type="number"
-                  min="1"
-                  placeholder="Ex: 60"
-                  value={calorieForm.minutos}
-                  onChange={(event) => setCalorieForm((current) => ({ ...current, minutos: event.target.value }))}
+                  step="1"
+                  placeholder="Ex: 178"
+                  value={calorieForm.altura}
+                  onChange={(event) => setCalorieForm((current) => ({ ...current, altura: event.target.value }))}
                 />
               </div>
             </div>
 
-            <label style={S.label}>Atividade</label>
+            <label style={S.label}>Idade (anos)</label>
+            <input
+              style={{ ...S.input, marginBottom: 8 }}
+              type="number"
+              min="1"
+              placeholder="Ex: 38"
+              value={calorieForm.idade}
+              onChange={(event) => setCalorieForm((current) => ({ ...current, idade: event.target.value }))}
+            />
+
+            <label style={S.label}>Nível de atividade</label>
             <select
               style={{ ...S.input, marginBottom: 8 }}
               value={calorieForm.atividadeId}
               onChange={(event) => setCalorieForm((current) => ({ ...current, atividadeId: event.target.value }))}
             >
-              {CALORIE_ACTIVITIES.map((activity) => (
+              {ACTIVITY_FACTORS.map((activity) => (
                 <option key={activity.id} value={activity.id}>
-                  {activity.nome} · MET {activity.met}
+                  {activity.nome} · fator {activity.fator}
                 </option>
               ))}
             </select>
 
-            <label style={S.label}>Intensidade percebida</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-              {[
-                ["leve", "Leve"],
-                ["padrao", "Padrão"],
-                ["intensa", "Intensa"],
-              ].map(([id, label]) => (
+            <p style={{ margin: "0 0 10px", color: "#64748b", fontSize: 13, lineHeight: 1.4 }}>
+              {getActivityFactor(calorieForm.atividadeId).desc}
+            </p>
+
+            <label style={S.label}>Objetivo</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+              {CALORIE_GOALS.map((goal) => (
                 <button
-                  key={id}
+                  key={goal.id}
                   style={{
                     ...S.btnGhost,
-                    color: calorieForm.intensidade === id ? "#0a0a0a" : "#e2e8f0",
-                    background: calorieForm.intensidade === id ? "#FACC15" : "#111827",
-                    borderColor: calorieForm.intensidade === id ? "#FACC15" : "#243044",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    color: calorieForm.objetivoId === goal.id ? "#0a0a0a" : "#e2e8f0",
+                    background: calorieForm.objetivoId === goal.id ? "#FACC15" : "#111827",
+                    borderColor: calorieForm.objetivoId === goal.id ? "#FACC15" : "#243044",
                     fontWeight: 800,
                   }}
-                  onClick={() => setCalorieForm((current) => ({ ...current, intensidade: id }))}
+                  onClick={() => setCalorieForm((current) => ({ ...current, objetivoId: goal.id }))}
                 >
-                  {label}
+                  <span>{goal.nome}</span>
+                  <span>{goal.ajuste > 0 ? "+" : ""}{goal.ajuste} kcal</span>
                 </button>
               ))}
             </div>
@@ -2353,18 +2405,36 @@ Formato obrigatório para celular:
             <p style={{ ...S.label, color: calorieResult ? p.cor : "#64748b" }}>Resultado</p>
             {calorieResult ? (
               <div>
-                <strong style={{ display: "block", color: p.cor, fontSize: 42, lineHeight: 1, marginBottom: 8 }}>
-                  {calorieResult.calories} kcal
-                </strong>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                  <div style={{ background: "#111827", border: "1px solid #243044", borderRadius: 10, padding: 12 }}>
+                    <p style={{ ...S.label, marginBottom: 4 }}>TMB</p>
+                    <strong style={{ color: "#f8fafc", fontSize: 24 }}>{calorieResult.tmb}</strong>
+                    <span style={{ color: "#64748b", fontSize: 13 }}> kcal/dia</span>
+                  </div>
+                  <div style={{ background: "#111827", border: "1px solid #243044", borderRadius: 10, padding: 12 }}>
+                    <p style={{ ...S.label, marginBottom: 4 }}>Manutenção</p>
+                    <strong style={{ color: "#f8fafc", fontSize: 24 }}>{calorieResult.maintenance}</strong>
+                    <span style={{ color: "#64748b", fontSize: 13 }}> kcal/dia</span>
+                  </div>
+                </div>
+                <div style={{ background: "#1a1500", border: "1px solid #FACC1555", borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                  <p style={{ ...S.label, color: p.cor, marginBottom: 5 }}>Meta diária sugerida</p>
+                  <strong style={{ display: "block", color: p.cor, fontSize: 42, lineHeight: 1, marginBottom: 6 }}>
+                    {calorieResult.target} kcal
+                  </strong>
+                  <p style={{ margin: 0, color: "#94a3b8", fontSize: 14, lineHeight: 1.5 }}>
+                    {calorieResult.goal.nome}: {calorieResult.goal.desc}. Proteína estimada: {calorieResult.proteinMin}-{calorieResult.proteinMax}g/dia.
+                  </p>
+                </div>
                 <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 14, lineHeight: 1.5 }}>
-                  {calorieResult.activity.nome}, {calorieResult.duration} min, {calorieResult.weight} kg, MET ajustado {calorieResult.met.toFixed(1)}.
+                  Fórmula Harris-Benedict com fator de atividade {calorieResult.activity.fator} ({calorieResult.activity.nome.toLowerCase()}).
                 </p>
                 <button style={{ ...S.btn(p.cor), width: "100%", color: "#0a0a0a" }} onClick={saveCalorieEstimate}>
                   Salvar estimativa
                 </button>
               </div>
             ) : (
-              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15 }}>Preencha peso e tempo para ver o gasto estimado.</p>
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15 }}>Preencha sexo, peso, altura e idade para ver a estimativa.</p>
             )}
           </div>
 
@@ -2378,8 +2448,13 @@ Formato obrigatório para celular:
                   <div key={item.id} style={{ border: "1px solid #243044", borderRadius: 10, padding: 12, background: "#0d1117" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
                       <div>
-                        <strong style={{ color: "#f8fafc", fontSize: 16 }}>{item.calorias} kcal</strong>
-                        <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 13 }}>{item.atividade} · {item.minutos} min · {item.peso} kg</p>
+                        <strong style={{ color: "#f8fafc", fontSize: 16 }}>{item.calorias} kcal/dia</strong>
+                        <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 13 }}>
+                          {item.objetivo || item.atividade} · TMB {item.tmb || "--"} · manutenção {item.manutencao || "--"}
+                        </p>
+                        <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12 }}>
+                          {item.peso} kg · {item.altura || "--"} cm · {item.idade || "--"} anos · proteína {item.proteina || "--"}
+                        </p>
                       </div>
                       <span style={S.badge("#FACC15")}>{formatDateTime(item.createdAt)}</span>
                     </div>
@@ -2388,7 +2463,7 @@ Formato obrigatório para celular:
               </div>
             )}
             <p style={{ margin: "12px 0 0", color: "#64748b", fontSize: 12, lineHeight: 1.5 }}>
-              Estimativa aproximada. Relógios, esteiras e fórmulas por MET podem variar conforme condicionamento, técnica e intensidade real.
+              Estimativa aproximada para planejamento. Ajuste conforme evolução real de peso, medidas, fome, energia e rendimento no treino.
             </p>
           </div>
         </div>
