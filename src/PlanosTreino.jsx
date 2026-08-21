@@ -656,6 +656,64 @@ function getAiConversationTitle(messages) {
   return firstUserMessage.length > 54 ? `${firstUserMessage.slice(0, 54)}...` : firstUserMessage;
 }
 
+function stripAiInlineMarkup(value) {
+  return String(value || "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
+}
+
+function cleanAiText(value) {
+  const lines = String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?[^>]+>/g, "")
+    .replace(/\r/g, "")
+    .split("\n");
+
+  const cleaned = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+
+    if (line.includes("|")) {
+      const tableLines = [];
+      while (index < lines.length && lines[index].includes("|")) {
+        tableLines.push(lines[index].trim());
+        index += 1;
+      }
+      index -= 1;
+
+      const rows = tableLines
+        .map((row) => row.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => stripAiInlineMarkup(cell)))
+        .filter((row) => row.length > 1 && !row.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, ""))));
+
+      if (rows.length > 1) {
+        const headers = rows[0];
+        rows.slice(1).forEach((row) => {
+          if (!row.some(Boolean)) return;
+          cleaned.push(`• ${row[0] || "Opção"}`);
+          row.slice(1).forEach((cell, cellIndex) => {
+            if (cell) cleaned.push(`  ${headers[cellIndex + 1] || "Detalhe"}: ${cell}`);
+          });
+          cleaned.push("");
+        });
+      } else if (rows.length === 1) {
+        cleaned.push(rows[0].filter(Boolean).join(" - "));
+      }
+      continue;
+    }
+
+    cleaned.push(stripAiInlineMarkup(line));
+  }
+
+  return cleaned
+    .join("\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function normalizeSearchText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -1294,7 +1352,13 @@ ${JSON.stringify(planoResumo, null, 2)}
 
 Plano ativo: ${plano.nome} — ${plano.subtitulo}
 
-Responda sempre em português, de forma direta, prática e motivadora. Foque em progressão de carga, técnica correta e segurança. Máximo 300 palavras por resposta.`;
+Responda sempre em português, de forma direta, prática e motivadora. Foque em progressão de carga, técnica correta e segurança.
+Formato obrigatório para celular:
+- Não use HTML.
+- Não use tabelas.
+- Não use Markdown pesado como **negrito**.
+- Use títulos curtos, listas simples e parágrafos curtos.
+- Máximo 300 palavras por resposta.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -1323,8 +1387,8 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
         throw new Error(err.error?.message || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content
-        || "Não consegui gerar uma resposta. Tente novamente.";
+      const reply = cleanAiText(data.choices?.[0]?.message?.content
+        || "Não consegui gerar uma resposta. Tente novamente.");
       const finalMessages = [...newMessages, { role: "assistant", text: reply }];
       setAiMessages(finalMessages);
       saveCurrentAiConversation(finalMessages);
@@ -2501,8 +2565,8 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
                 <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, background: m.role === "user" ? "#1e1e1e" : "#1a1500", border: `1px solid ${m.role === "user" ? "#333" : "#FACC1566"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
                   {m.role === "user" ? "EU" : "AI"}
                 </div>
-                <div style={{ background: m.role === "user" ? "#1e1e1e" : "#111", border: `1px solid ${m.role === "user" ? "#333" : "#FACC1530"}`, borderRadius: m.role === "user" ? "8px 4px 8px 8px" : "4px 8px 8px 8px", padding: "10px 14px", maxWidth: "80%", fontSize: 13, color: "#e2e8f0", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                  {m.text}
+                <div style={{ background: m.role === "user" ? "#1e1e1e" : "#111", border: `1px solid ${m.role === "user" ? "#333" : "#FACC1530"}`, borderRadius: m.role === "user" ? "8px 4px 8px 8px" : "4px 8px 8px 8px", padding: "12px 14px", maxWidth: "80%", fontSize: 14, color: "#e2e8f0", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
+                  {m.role === "assistant" ? cleanAiText(m.text) : m.text}
                 </div>
               </div>
             ))}
