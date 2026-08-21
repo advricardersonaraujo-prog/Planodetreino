@@ -30,7 +30,7 @@ O Coach IA usa a API da Groq pelo endpoint compativel com OpenAI.
    - `VITE_GROQ_API_KEY`
 3. Faca um novo deploy.
 
-Modelo usado no app: `llama-3.3-70b-versatile`.
+Modelo usado no app: `openai/gpt-oss-20b`.
 
 ## Rodar localmente
 

@@ -800,7 +800,7 @@ Responda sempre em português, de forma direta, prática e motivadora. Foque em 
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "openai/gpt-oss-20b",
           messages,
           max_tokens: 512,
           temperature: 0.7,
